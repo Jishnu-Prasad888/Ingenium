@@ -8,11 +8,13 @@ const Header: React.FC = () => (
       <Text
         style={{
           fontSize: 52,
-          fontFamily: "serif",
+          fontFamily: "logo",
           textAlign: "center",
           color: colors.text,
           letterSpacing: -1,
-          fontWeight: "300",
+          fontWeight: "600",
+          paddingTop: 10,
+          marginBottom: -6,
         }}
       >
         Ingenium

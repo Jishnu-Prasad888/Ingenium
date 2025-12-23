@@ -7,9 +7,16 @@ interface DividerProps {
 }
 
 const Divider: React.FC<DividerProps> = ({ text }) => (
-  <View style={{ alignItems: "center", marginTop: -1, marginVertical: 12 }}>
+  <View style={{ alignItems: "center", marginTop: -2, marginVertical: 12 }}>
     <View style={{ flexDirection: "row", alignItems: "center", width: "100%" }}>
-      <View style={{ flex: 1, height: 1, backgroundColor: colors.text }} />
+      <View
+        style={{
+          flex: 1,
+          height: 1,
+          backgroundColor: colors.text,
+          marginLeft: 44,
+        }}
+      />
       <Text
         style={{
           marginHorizontal: 16,
@@ -21,7 +28,14 @@ const Divider: React.FC<DividerProps> = ({ text }) => (
       >
         {text}
       </Text>
-      <View style={{ flex: 1, height: 1, backgroundColor: colors.text }} />
+      <View
+        style={{
+          flex: 1,
+          height: 1,
+          backgroundColor: colors.text,
+          marginRight: 44,
+        }}
+      />
     </View>
   </View>
 );
