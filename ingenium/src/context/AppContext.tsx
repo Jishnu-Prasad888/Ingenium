@@ -44,7 +44,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("date-desc");
   const [isSyncing, setIsSyncing] = useState(false);
-  const isCreatingNoteRef = useRef(false);
 
   useEffect(() => {
     loadData();
@@ -125,9 +124,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
             ...updates,
             updatedAt: Date.now(),
             syncStatus: "pending",
-            // Ensure title is always a non-null string
             title:
-              updates.title && typeof updates.title === "string"
+              typeof updates.title === "string"
                 ? updates.title.trim()
                 : note.title,
           }

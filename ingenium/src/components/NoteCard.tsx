@@ -13,11 +13,7 @@ interface NoteCardProps {
 const NoteCard: React.FC<NoteCardProps> = ({ note }) => {
   const { setCurrentNoteId, setCurrentScreen } = useApp();
 
-  // Safely handle note data
-  const title =
-    note?.title && typeof note.title === "string"
-      ? note.title
-      : "Untitled Note";
+  const title = typeof note?.title === "string" ? note.title : "";
   const content =
     note?.content && typeof note.content === "string" ? note.content : "";
   const createdAt = note?.createdAt ? note.createdAt : Date.now();
@@ -53,7 +49,7 @@ const NoteCard: React.FC<NoteCardProps> = ({ note }) => {
               marginBottom: 4,
             }}
           >
-            {title}
+            <Text>{title.length > 0 ? title : "Untitled Note"}</Text>
           </Text>
           <Text
             style={{

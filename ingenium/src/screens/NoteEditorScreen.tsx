@@ -56,8 +56,8 @@ const NoteEditorScreen: React.FC = () => {
   const folder = folders.find((f) => f.id === note.folderId);
   const folderPath = folder ? getCurrentPath() : "/";
 
-  // Safely handle note data
-  const title = note?.title && typeof note.title === "string" ? note.title : "";
+  const title = typeof note?.title === "string" ? note.title : "";
+
   const content =
     note?.content && typeof note.content === "string" ? note.content : "";
   const createdAt = note?.createdAt ? note.createdAt : Date.now();
