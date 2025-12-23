@@ -13,6 +13,15 @@ interface NoteCardProps {
 const NoteCard: React.FC<NoteCardProps> = ({ note }) => {
   const { setCurrentNoteId, setCurrentScreen } = useApp();
 
+  // Safely handle note data
+  const title =
+    note?.title && typeof note.title === "string"
+      ? note.title
+      : "Untitled Note";
+  const content =
+    note?.content && typeof note.content === "string" ? note.content : "";
+  const createdAt = note?.createdAt ? note.createdAt : Date.now();
+
   return (
     <TouchableOpacity
       style={{
@@ -22,8 +31,10 @@ const NoteCard: React.FC<NoteCardProps> = ({ note }) => {
         marginBottom: 12,
       }}
       onPress={() => {
-        setCurrentNoteId(note.id);
-        setCurrentScreen("note-editor");
+        if (note?.id) {
+          setCurrentNoteId(note.id);
+          setCurrentScreen("note-editor");
+        }
       }}
     >
       <View
@@ -42,7 +53,7 @@ const NoteCard: React.FC<NoteCardProps> = ({ note }) => {
               marginBottom: 4,
             }}
           >
-            {note.title}
+            {title}
           </Text>
           <Text
             style={{
@@ -51,10 +62,10 @@ const NoteCard: React.FC<NoteCardProps> = ({ note }) => {
               marginBottom: 8,
             }}
           >
-            {formatDate(note.createdAt)}
+            {formatDate(createdAt)}
           </Text>
           <Text style={{ fontSize: 14, color: colors.text }} numberOfLines={2}>
-            {note.content || "No content"}
+            {content || "No content"}
           </Text>
         </View>
         <CircleChevronRight size={24} color={colors.text} />

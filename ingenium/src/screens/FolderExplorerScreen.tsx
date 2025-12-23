@@ -1,11 +1,5 @@
 import React from "react";
-import {
-  View,
-  ScrollView,
-  TouchableOpacity,
-  Text,
-  SafeAreaView,
-} from "react-native";
+import { View, ScrollView, TouchableOpacity, Text } from "react-native";
 import { ChevronLeft, Plus } from "lucide-react-native";
 import { useApp } from "../context/AppContext";
 import Header from "../components/Header";
@@ -38,17 +32,25 @@ const FolderExplorerScreen: React.FC = () => {
     "folder"
   );
 
+  const handleCreateFolder = () => {
+    const name = `Folder ${folders.length + 1}`;
+    createFolder(name, currentFolderId);
+  };
+
+  const handleCreateNote = () => {
+    createNote(currentFolderId);
+  };
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Header />
       <SearchBar />
 
-      {/* Back button + SortControl row */}
       <View
         style={{
           flexDirection: "row",
           alignItems: "center",
-          paddingHorizontal: 12, // reduced gap to screen edge
+          paddingHorizontal: 20,
           marginBottom: 12,
         }}
       >
@@ -62,50 +64,36 @@ const FolderExplorerScreen: React.FC = () => {
               marginRight: 12,
               flexDirection: "row",
               alignItems: "center",
+              shadowColor: colors.shadow,
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.1,
+              shadowRadius: 2,
+              elevation: 1,
             }}
             onPress={() => {
               const parent = folders.find((f) => f.id === currentFolderId);
-              setCurrentFolderId(parent?.parentId ?? null);
+              setCurrentFolderId(parent?.parentId || null);
             }}
           >
             <ChevronLeft size={16} color={colors.text} />
-            <Text
-              style={{
-                marginLeft: 4,
-                color: colors.text,
-              }}
-              numberOfLines={1}
-            >
-              Back
-            </Text>
+            <Text style={{ marginLeft: 4, color: colors.text }}>Back</Text>
           </TouchableOpacity>
         )}
 
-        <View
-          style={{
-            flex: 1,
-            minWidth: 0,
-            justifyContent: "center",
-          }}
-        >
+        <View style={{ flex: 1 }}>
           <SortControl />
         </View>
       </View>
 
-      {/* Folder path */}
       <View style={{ paddingHorizontal: 20, marginBottom: 12 }}>
         <Text
           style={{ fontSize: 18, color: colors.primary, fontFamily: "serif" }}
         >
-          Folder path : {getCurrentPath()}
+          {getCurrentPath()}
         </Text>
       </View>
 
-      {/* Notes and folders */}
-      <ScrollView
-        contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
-        showsVerticalScrollIndicator={false}
-      >
+      <ScrollView style={{ flex: 1, paddingHorizontal: 20 }}>
         {currentFolderNotes.map((note) => (
           <NoteCard key={note.id} note={note} />
         ))}
@@ -127,13 +115,14 @@ const FolderExplorerScreen: React.FC = () => {
         {currentFolderNotes.length === 0 && subfolders.length > 0 && (
           <Divider text="End of Folders" />
         )}
+
+        <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Bottom buttons */}
       <View
         style={{
           paddingHorizontal: 20,
-          paddingBottom: 120,
+          paddingBottom: 16,
           flexDirection: "row",
         }}
       >
@@ -142,54 +131,54 @@ const FolderExplorerScreen: React.FC = () => {
             flex: 1,
             backgroundColor: colors.backgroundCard,
             borderRadius: 12,
-            height: 40,
-            marginRight: 5,
+            padding: 16,
+            marginRight: 8,
             alignItems: "center",
             flexDirection: "row",
             justifyContent: "center",
+            shadowColor: colors.shadow,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 4,
+            elevation: 2,
           }}
-          onPress={() => createFolder(currentFolderId)}
+          onPress={handleCreateFolder}
         >
-          <Text style={{ fontSize: 12, color: colors.text, marginRight: 2 }}>
+          <Text style={{ fontSize: 16, color: colors.text, marginRight: 8 }}>
             Create a new folder
           </Text>
-          <Plus size={16} color={colors.text} />
+          <Plus size={18} color={colors.text} />
         </TouchableOpacity>
+
         <View
-          style={{
-            justifyContent: "center",
-          }}
-        >
-          <View
-            style={{
-              width: 2,
-              height: 35,
-              backgroundColor: "brown",
-              borderRadius: 1,
-            }}
-          />
-        </View>
+          style={{ width: 2, backgroundColor: colors.text, opacity: 0.3 }}
+        />
+
         <TouchableOpacity
           style={{
             flex: 1,
             backgroundColor: colors.backgroundCard,
             borderRadius: 12,
-            height: 40,
-            padding: 2,
-            marginLeft: 4,
+            padding: 16,
+            marginLeft: 8,
             alignItems: "center",
             flexDirection: "row",
             justifyContent: "center",
+            shadowColor: colors.shadow,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 4,
+            elevation: 2,
           }}
-          onPress={() => createNote(currentFolderId)}
+          onPress={handleCreateNote}
         >
-          <Text style={{ fontSize: 12, color: colors.text, marginRight: 2 }}>
+          <Text style={{ fontSize: 16, color: colors.text, marginRight: 8 }}>
             Create a new note
           </Text>
-          <Plus size={16} color={colors.text} />
+          <Plus size={18} color={colors.text} />
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
