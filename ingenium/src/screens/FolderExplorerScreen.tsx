@@ -33,7 +33,17 @@ const FolderExplorerScreen: React.FC = () => {
   );
 
   const handleCreateFolder = () => {
-    const name = `Folder ${folders.length + 1}`;
+    const existingNumbers = folders
+      .map((f) => {
+        const match = f.name.match(/^Folder (\d+)$/);
+        return match ? parseInt(match[1], 10) : 0;
+      })
+      .filter((n) => n > 0);
+
+    const nextNumber =
+      existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 1;
+    const name = `Folder ${nextNumber}`;
+
     createFolder(name, currentFolderId);
   };
 
@@ -62,6 +72,7 @@ const FolderExplorerScreen: React.FC = () => {
               paddingHorizontal: 12,
               paddingVertical: 8,
               marginRight: 12,
+              marginTop: -10,
               flexDirection: "row",
               alignItems: "center",
               shadowColor: colors.shadow,
@@ -85,11 +96,11 @@ const FolderExplorerScreen: React.FC = () => {
         </View>
       </View>
 
-      <View style={{ paddingHorizontal: 20, marginBottom: 12 }}>
+      <View style={{ paddingHorizontal: 20, marginBottom: 12, marginTop: -10 }}>
         <Text
-          style={{ fontSize: 18, color: colors.primary, fontFamily: "serif" }}
+          style={{ fontSize: 16, color: colors.primary, fontFamily: "serif" }}
         >
-          {getCurrentPath()}
+          Folder : {getCurrentPath()}
         </Text>
       </View>
 
@@ -112,18 +123,17 @@ const FolderExplorerScreen: React.FC = () => {
           <FolderCard key={folder.id} folder={folder} />
         ))}
 
-        {currentFolderNotes.length === 0 && subfolders.length > 0 && (
-          <Divider text="End of Folders" />
-        )}
-
         <View style={{ height: 100 }} />
       </ScrollView>
 
       <View
         style={{
           paddingHorizontal: 20,
-          paddingBottom: 16,
+          paddingBottom: 112,
           flexDirection: "row",
+          alignItems: "center",
+          alignContent: "center",
+          justifyContent: "center",
         }}
       >
         <TouchableOpacity
@@ -131,8 +141,10 @@ const FolderExplorerScreen: React.FC = () => {
             flex: 1,
             backgroundColor: colors.backgroundCard,
             borderRadius: 12,
-            padding: 16,
-            marginRight: 8,
+            paddingLeft: 10,
+            paddingRight: 20,
+            marginRight: 10,
+            height: 45,
             alignItems: "center",
             flexDirection: "row",
             justifyContent: "center",
@@ -144,14 +156,27 @@ const FolderExplorerScreen: React.FC = () => {
           }}
           onPress={handleCreateFolder}
         >
-          <Text style={{ fontSize: 16, color: colors.text, marginRight: 8 }}>
+          <Text
+            style={{
+              fontSize: 14,
+              color: colors.text,
+              paddingLeft: 10,
+              textAlign: "center",
+            }}
+          >
             Create a new folder
           </Text>
           <Plus size={18} color={colors.text} />
         </TouchableOpacity>
 
         <View
-          style={{ width: 2, backgroundColor: colors.text, opacity: 0.3 }}
+          style={{
+            width: 3,
+            backgroundColor: colors.primary,
+            opacity: 1,
+            height: 34,
+            borderRadius: 12,
+          }}
         />
 
         <TouchableOpacity
@@ -159,8 +184,10 @@ const FolderExplorerScreen: React.FC = () => {
             flex: 1,
             backgroundColor: colors.backgroundCard,
             borderRadius: 12,
-            padding: 16,
-            marginLeft: 8,
+            paddingLeft: 10,
+            paddingRight: 20,
+            marginLeft: 10,
+            height: 45,
             alignItems: "center",
             flexDirection: "row",
             justifyContent: "center",
@@ -172,7 +199,14 @@ const FolderExplorerScreen: React.FC = () => {
           }}
           onPress={handleCreateNote}
         >
-          <Text style={{ fontSize: 16, color: colors.text, marginRight: 8 }}>
+          <Text
+            style={{
+              fontSize: 14,
+              color: colors.text,
+              paddingLeft: 10,
+              textAlign: "center",
+            }}
+          >
             Create a new note
           </Text>
           <Plus size={18} color={colors.text} />

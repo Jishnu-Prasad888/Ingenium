@@ -46,11 +46,12 @@ const NotesListScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
+      <Divider text="Your notes here" />
+
       <ScrollView ref={scrollRef} style={{ flex: 1, paddingHorizontal: 20 }}>
         {allNotes.map((note) => (
           <NoteCard key={note.id} note={note} />
         ))}
-        <Divider text="End of Notes" />
         <View style={{ height: 100 }} />
       </ScrollView>
 

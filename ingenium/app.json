@@ -27,6 +27,14 @@
       "bundler": "metro",
       "output": "static",
       "favicon": "./assets/images/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-font",
+        {
+          "fonts": ["./assets/fonts/AngularFlow.ttf"]
+        }
+      ]
+    ]
   }
 }

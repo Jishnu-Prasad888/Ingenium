@@ -75,11 +75,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   };
 
   const createFolder = (name: string, parentId: string | null = null) => {
-    // Check if name is provided and is a string
-    if (!name || typeof name !== "string" || !name.trim()) {
-      console.warn("Invalid folder name provided");
-      return;
-    }
+    if (!name || !name.trim()) return;
 
     const newFolder: Folder = {
       id: generateSyncId(),
@@ -89,8 +85,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       updatedAt: Date.now(),
       syncStatus: "pending",
     };
+
+    // 1️⃣ Update state first
+    setFolders((prev) => {
+      if (prev.some((f) => f.id === newFolder.id)) return prev;
+      return [...prev, newFolder];
+    });
+
+    // 2️⃣ Save folder separately, outside the functional updater
     StorageService.saveFolder(newFolder);
-    setFolders([...folders, newFolder]);
   };
 
   const createNote = (folderId: string | null = null) => {
