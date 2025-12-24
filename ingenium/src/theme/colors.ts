@@ -10,5 +10,7 @@ export const colors = {
     textSecondary: '#5C4033',
     border: '#D4A574',
     white: '#FFFFFF',
-    shadow: 'rgba(44, 24, 16, 0.1)'
+    shadow: 'rgba(44, 24, 16, 0.1)',
+    error : 'rgba(255,0,0,255),'
+
 };

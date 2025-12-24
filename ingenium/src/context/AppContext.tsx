@@ -5,11 +5,18 @@ import React, {
   useEffect,
   ReactNode,
   useRef,
+  useCallback,
 } from "react";
+import {
+  AppState,
+  AppStateStatus,
+  Platform,
+  BackHandler,
+  Alert,
+} from "react-native";
 import StorageService, { Folder, Note } from "../services/StorageService";
 import SyncService from "../services/SyncService";
 import { generateSyncId } from "../utils/helpers";
-
 interface AppContextType {
   folders: Folder[];
   notes: Note[];
@@ -29,6 +36,9 @@ interface AppContextType {
   updateNote: (id: string, updates: Partial<Note>) => void;
   getCurrentPath: () => string;
   getFilteredAndSortedItems: (items: any[], type: "note" | "folder") => any[];
+  ensureDataSaved: () => Promise<void>;
+  exportData: () => Promise<string>;
+  importData: (jsonData: string) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -45,10 +55,116 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   const [sortBy, setSortBy] = useState("date-desc");
   const [isSyncing, setIsSyncing] = useState(false);
 
+  const isSavingRef = useRef(false);
+  const appStateRef = useRef(AppState.currentState);
+  const isExitingRef = useRef(false);
+
   useEffect(() => {
     loadData();
     performInitialSync();
+    setupAppStateListeners();
+
+    // Initialize storage service
+    StorageService.initialize();
+
+    return () => {
+      cleanup();
+    };
   }, []);
+
+  const setupAppStateListeners = () => {
+    // Listen for app state changes
+    const subscription = AppState.addEventListener(
+      "change",
+      handleAppStateChange
+    );
+
+    // Handle hardware back button on Android
+    if (Platform.OS === "android") {
+      const backHandler = BackHandler.addEventListener(
+        "hardwareBackPress",
+        handleBackPress
+      );
+      return () => {
+        subscription.remove();
+        backHandler.remove();
+      };
+    }
+
+    return () => subscription.remove();
+  };
+
+  const handleAppStateChange = useCallback(
+    async (nextAppState: AppStateStatus) => {
+      if (
+        appStateRef.current.match(/inactive|background/) &&
+        nextAppState === "active"
+      ) {
+        // App coming to foreground
+        console.log("App has come to the foreground");
+        await loadData();
+      } else if (nextAppState.match(/inactive|background/)) {
+        // App going to background
+        console.log("App is going to the background");
+        await ensureAllDataSaved();
+      }
+
+      appStateRef.current = nextAppState;
+    },
+    []
+  );
+
+  const handleBackPress = useCallback(() => {
+    if (
+      currentScreen === "note-editor" ||
+      currentScreen === "folder-explorer"
+    ) {
+      // Save data before navigating back
+      ensureAllDataSaved().then(() => {
+        // Navigate back based on current screen
+        if (currentScreen === "note-editor") {
+          setCurrentScreen("notes-list");
+        } else if (currentScreen === "folder-explorer") {
+          const parent = folders.find((f) => f.id === currentFolderId);
+          setCurrentFolderId(parent?.parentId || null);
+        }
+      });
+      return true; // Prevent default back behavior
+    }
+    return false;
+  }, [currentScreen, currentFolderId, folders]);
+
+  // Ensure all data is saved
+  const ensureAllDataSaved = async (): Promise<void> => {
+    if (isSavingRef.current) return;
+
+    isSavingRef.current = true;
+    try {
+      console.log("Ensuring all data is saved...");
+      await StorageService.ensureDataSaved();
+      console.log("All data saved successfully");
+    } catch (error) {
+      console.error("Error saving data:", error);
+    } finally {
+      isSavingRef.current = false;
+    }
+  };
+
+  // Handle app exit/cleanup
+  const cleanup = async () => {
+    if (isExitingRef.current) return;
+
+    isExitingRef.current = true;
+    console.log("Performing cleanup before exit...");
+
+    try {
+      await ensureAllDataSaved();
+      // Optionally perform a final sync
+      await SyncService.quickSync();
+    } catch (error) {
+      console.error("Error during cleanup:", error);
+    }
+  };
 
   const loadData = async () => {
     const loadedFolders = await StorageService.getFolders();
@@ -74,7 +190,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     setIsSyncing(false);
   };
 
-  const createFolder = (name: string, parentId: string | null = null) => {
+  // Update createFolder to ensure immediate save
+  const createFolder = async (name: string, parentId: string | null = null) => {
     if (!name || !name.trim()) return;
 
     const newFolder: Folder = {
@@ -86,17 +203,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       syncStatus: "pending",
     };
 
-    // 1️⃣ Update state first
+    // Update state first
     setFolders((prev) => {
       if (prev.some((f) => f.id === newFolder.id)) return prev;
       return [...prev, newFolder];
     });
 
-    // 2️⃣ Save folder separately, outside the functional updater
-    StorageService.saveFolder(newFolder);
+    // Save to database
+    await StorageService.saveFolder(newFolder);
+
+    // Ensure immediate persistence
+    await ensureAllDataSaved();
   };
 
-  const createNote = (folderId: string | null = null) => {
+  // Update createNote to ensure immediate save
+  const createNote = async (folderId: string | null = null) => {
     const newNote: Note = {
       id: generateSyncId(),
       folderId: folderId || currentFolderId,
@@ -114,12 +235,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       return [...prev, newNote];
     });
 
-    StorageService.saveNote(newNote);
+    await StorageService.saveNote(newNote);
+    await ensureAllDataSaved();
+
     setCurrentNoteId(newNote.id);
     setCurrentScreen("note-editor");
   };
 
-  const updateNote = (id: string, updates: Partial<Note>) => {
+  // Update updateNote to ensure immediate save
+  const updateNote = async (id: string, updates: Partial<Note>) => {
     const updatedNotes = notes.map((note) =>
       note.id === id
         ? {
@@ -134,10 +258,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
           }
         : note
     );
+
     setNotes(updatedNotes);
+
     const updated = updatedNotes.find((n) => n.id === id);
     if (updated) {
-      StorageService.saveNote(updated);
+      await StorageService.saveNote(updated);
+      await ensureAllDataSaved();
     }
   };
 
@@ -251,6 +378,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     updateNote,
     getCurrentPath,
     getFilteredAndSortedItems,
+    ensureDataSaved: ensureAllDataSaved,
+    exportData: StorageService.exportData,
+    importData: StorageService.importData,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

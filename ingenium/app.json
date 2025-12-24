@@ -32,9 +32,12 @@
       [
         "expo-font",
         {
-          "fonts": ["./assets/fonts/logo.ttf"]
+          "fonts": [
+            "./assets/fonts/logo.ttf"
+          ]
         }
-      ]
+      ],
+      "expo-sqlite"
     ]
   }
 }
