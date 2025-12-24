@@ -1,9 +1,17 @@
-// components/DeleteConfirmationPopup.tsx
-import React from "react";
-import { View, Text, Modal, TouchableOpacity, StyleSheet } from "react-native";
+import React, { useEffect, useRef } from "react";
+import {
+  View,
+  Text,
+  Modal,
+  StyleSheet,
+  Animated,
+  Pressable,
+  TouchableWithoutFeedback,
+  Easing,
+} from "react-native";
 import { colors } from "../theme/colors";
 
-interface DeleteConfirmationPopupProps {
+interface Props {
   visible: boolean;
   onConfirm: () => void;
   onCancel: () => void;
@@ -12,150 +20,227 @@ interface DeleteConfirmationPopupProps {
   itemName?: string;
 }
 
-const DeleteConfirmationPopup: React.FC<DeleteConfirmationPopupProps> = ({
+const DeleteConfirmationPopup: React.FC<Props> = ({
   visible,
   onConfirm,
   onCancel,
-  title = "Confirm Deletion",
-  message = "Are you sure you want to delete this item?",
+  title = "Delete item?",
+  message = "This action will permanently remove the item.",
   itemName,
 }) => {
+  const scale = useRef(new Animated.Value(0.92)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 180,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scale, {
+          toValue: 1,
+          damping: 18,
+          stiffness: 160,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(scale, {
+          toValue: 0.92,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible]);
+
   return (
-    <Modal
-      visible={visible}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={onCancel}
-    >
-      <View style={styles.overlay}>
-        <View style={styles.popupContainer}>
+    <Modal transparent visible={visible} animationType="none">
+      <TouchableWithoutFeedback onPress={onCancel}>
+        <Animated.View style={[styles.overlay, { opacity }]} />
+      </TouchableWithoutFeedback>
+
+      <View style={styles.centerWrapper}>
+        <Animated.View
+          style={[
+            styles.container,
+            {
+              opacity,
+              transform: [{ scale }],
+            },
+          ]}
+        >
           <Text style={styles.title}>{title}</Text>
 
           <Text style={styles.message}>{message}</Text>
 
           {itemName && (
-            <View style={styles.itemNameContainer}>
-              <Text style={styles.itemNameLabel}>Item:</Text>
-              <Text style={styles.itemNameText}>"{itemName}"</Text>
+            <View style={styles.itemBox}>
+              <Text style={styles.itemLabel}>Item</Text>
+              <Text style={styles.itemName}>{itemName}</Text>
             </View>
           )}
 
-          <Text style={styles.warningText}>This action cannot be undone.</Text>
+          <Text style={styles.warning}>This action cannot be undone.</Text>
 
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={[styles.button, styles.cancelButton]}
+          <View style={styles.actions}>
+            <AnimatedButton
+              label="Cancel"
               onPress={onCancel}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
+              style={styles.cancelButton}
+              textStyle={styles.cancelText}
+            />
 
-            <TouchableOpacity
-              style={[styles.button, styles.deleteButton]}
+            <AnimatedButton
+              label="Delete"
               onPress={onConfirm}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.deleteButtonText}>Delete</Text>
-            </TouchableOpacity>
+              style={styles.deleteButton}
+              textStyle={styles.deleteText}
+            />
           </View>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );
 };
 
+const AnimatedButton = ({ label, onPress, style, textStyle }: any) => {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  return (
+    <Pressable
+      onPressIn={() =>
+        Animated.spring(scale, {
+          toValue: 0.96,
+          useNativeDriver: true,
+        }).start()
+      }
+      onPressOut={() =>
+        Animated.spring(scale, {
+          toValue: 1,
+          friction: 4,
+          useNativeDriver: true,
+        }).start()
+      }
+      onPress={onPress}
+      style={{ flex: 1 }}
+    >
+      <Animated.View style={[style, { transform: [{ scale }] }]}>
+        <Text style={textStyle}>{label}</Text>
+      </Animated.View>
+    </Pressable>
+  );
+};
+
 const styles = StyleSheet.create({
   overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.45)",
+  },
+
+  centerWrapper: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
     justifyContent: "center",
     alignItems: "center",
-    padding: 20,
-  },
-  popupContainer: {
-    backgroundColor: colors.backgroundCard,
-    borderRadius: 12,
     padding: 24,
+  },
+
+  container: {
     width: "100%",
-    maxWidth: 400,
+    maxWidth: 420,
+    backgroundColor: colors.backgroundCard,
+    borderRadius: 18,
+    padding: 28,
     shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.28,
+    shadowRadius: 18,
+    elevation: 10,
   },
+
   title: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: colors.error,
-    marginBottom: 12,
+    fontSize: 21,
+    fontWeight: "700",
+    color: colors.text,
     textAlign: "center",
+    marginBottom: 10,
   },
+
   message: {
-    fontSize: 16,
-    color: colors.text,
-    marginBottom: 16,
-    textAlign: "center",
+    fontSize: 15.5,
     lineHeight: 22,
-  },
-  itemNameContainer: {
-    backgroundColor: colors.backgroundAlt,
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  itemNameLabel: {
-    fontSize: 14,
     color: colors.textSecondary,
-    marginRight: 8,
-    fontWeight: "600",
-  },
-  itemNameText: {
-    fontSize: 15,
-    color: colors.text,
-    fontWeight: "500",
-    flex: 1,
-  },
-  warningText: {
-    fontSize: 14,
-    color: colors.error,
-    fontStyle: "italic",
-    marginBottom: 24,
     textAlign: "center",
+    marginBottom: 20,
   },
-  buttonContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    gap: 12,
-  },
-  button: {
-    flex: 1,
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: 48,
-  },
-  cancelButton: {
+
+  itemBox: {
     backgroundColor: colors.backgroundAlt,
+    borderRadius: 10,
+    padding: 14,
+    marginBottom: 18,
+  },
+
+  itemLabel: {
+    fontSize: 12,
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    color: colors.textSecondary,
+    marginBottom: 4,
+  },
+
+  itemName: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: colors.text,
+  },
+
+  warning: {
+    fontSize: 13.5,
+    fontStyle: "italic",
+    color: colors.textSecondary,
+    textAlign: "center",
+    marginBottom: 24,
+  },
+
+  actions: {
+    flexDirection: "row",
+    gap: 14,
+  },
+
+  cancelButton: {
+    paddingVertical: 14,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
+    alignItems: "center",
   },
-  deleteButton: {
-    backgroundColor: colors.error,
-  },
-  cancelButtonText: {
-    fontSize: 16,
+
+  cancelText: {
+    fontSize: 15,
+    fontWeight: "600",
     color: colors.text,
-    fontWeight: "600",
   },
-  deleteButtonText: {
-    fontSize: 16,
-    color: colors.white,
+
+  deleteButton: {
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: colors.error,
+    alignItems: "center",
+  },
+
+  deleteText: {
+    fontSize: 15,
     fontWeight: "600",
+    color: colors.white,
   },
 });
 
