@@ -1,6 +1,14 @@
-import React from "react";
+import React, { useState } from "react";
+import {
+  ChevronLeft,
+  Plus,
+  ChevronDown,
+  ChevronRight,
+  Folder,
+  FileText,
+} from "lucide-react-native";
+
 import { View, ScrollView, TouchableOpacity, Text } from "react-native";
-import { ChevronLeft, Plus } from "lucide-react-native";
 import { useApp } from "../context/AppContext";
 import Header from "../components/Header";
 import SearchBar from "../components/SearchBar";
@@ -50,6 +58,49 @@ const FolderExplorerScreen: React.FC = () => {
   const handleCreateNote = () => {
     createNote(currentFolderId);
   };
+
+  const [showNotes, setShowNotes] = useState(true);
+  const [showFolders, setShowFolders] = useState(true);
+
+  const SectionHeader = ({
+    title,
+    count,
+    expanded,
+    onPress,
+  }: {
+    title: string;
+    count: number;
+    expanded: boolean;
+    onPress: () => void;
+  }) => (
+    <TouchableOpacity
+      onPress={onPress}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "space-between",
+        paddingVertical: 12,
+      }}
+    >
+      {/* Left side: text */}
+      <Text
+        style={{
+          fontSize: 15,
+          color: colors.text,
+          fontWeight: "600",
+        }}
+      >
+        {title} ({count})
+      </Text>
+
+      {/* Right side: icon only */}
+      {expanded ? (
+        <ChevronDown size={20} color={colors.text} />
+      ) : (
+        <ChevronRight size={20} color={colors.text} />
+      )}
+    </TouchableOpacity>
+  );
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -112,23 +163,51 @@ const FolderExplorerScreen: React.FC = () => {
           borderRadius: 10,
         }}
       >
-        {currentFolderNotes.map((note) => (
-          <NoteCard key={note.id} note={note} />
-        ))}
+        {/* Notes Section (only if notes exist) */}
+        {currentFolderNotes.length > 0 && (
+          <>
+            <SectionHeader
+              title="Notes"
+              count={currentFolderNotes.length}
+              expanded={showNotes}
+              onPress={() => setShowNotes((prev) => !prev)}
+            />
 
+            {showNotes &&
+              currentFolderNotes.map((note) => (
+                <NoteCard key={note.id} note={note} />
+              ))}
+          </>
+        )}
+
+        {/* Divider only if both sections exist */}
         {currentFolderNotes.length > 0 && subfolders.length > 0 && (
           <View
             style={{
-              height: 2,
+              height: 1,
               backgroundColor: colors.text,
               marginVertical: 16,
+              opacity: 0.3,
             }}
           />
         )}
 
-        {subfolders.map((folder) => (
-          <FolderCard key={folder.id} folder={folder} />
-        ))}
+        {/* Folders Section (only if folders exist) */}
+        {subfolders.length > 0 && (
+          <>
+            <SectionHeader
+              title="Folders"
+              count={subfolders.length}
+              expanded={showFolders}
+              onPress={() => setShowFolders((prev) => !prev)}
+            />
+
+            {showFolders &&
+              subfolders.map((folder) => (
+                <FolderCard key={folder.id} folder={folder} />
+              ))}
+          </>
+        )}
 
         <View style={{ height: 100 }} />
       </ScrollView>
