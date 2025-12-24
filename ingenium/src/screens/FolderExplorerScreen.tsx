@@ -72,7 +72,7 @@ const FolderExplorerScreen: React.FC = () => {
               paddingHorizontal: 12,
               paddingVertical: 8,
               marginRight: 12,
-              marginTop: -10,
+              marginTop: -11,
               flexDirection: "row",
               alignItems: "center",
               shadowColor: colors.shadow,
