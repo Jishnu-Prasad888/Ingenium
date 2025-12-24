@@ -27,6 +27,7 @@ const NotesListScreen: React.FC = () => {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Header />
       <SearchBar />
+
       <SortControl />
 
       <View style={{ paddingHorizontal: 20, marginBottom: 12 }}>
@@ -35,6 +36,7 @@ const NotesListScreen: React.FC = () => {
             backgroundColor: colors.backgroundCard,
             borderRadius: 12,
             padding: 16,
+            height: 54,
             alignItems: "center",
             flexDirection: "row",
             justifyContent: "center",
@@ -42,7 +44,7 @@ const NotesListScreen: React.FC = () => {
             shadowOffset: { width: 0, height: 2 },
             shadowOpacity: 0.1,
             shadowRadius: 4,
-            elevation: 2,
+            elevation: 0,
           }}
           onPress={() => createNote(null)}
         >

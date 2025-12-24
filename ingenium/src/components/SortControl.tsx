@@ -1,5 +1,11 @@
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  SafeAreaViewBase,
+} from "react-native";
 import {
   ChevronDown,
   Calendar,
@@ -9,7 +15,7 @@ import {
 } from "lucide-react-native";
 import { useApp } from "../context/AppContext";
 import { colors } from "../theme/colors";
-
+import { SafeAreaView } from "react-native";
 const SortControl: React.FC = () => {
   const { sortBy, setSortBy } = useApp();
   const [open, setOpen] = useState(false);
@@ -40,55 +46,57 @@ const SortControl: React.FC = () => {
   const selectedOption = options.find((o) => o.key === sortBy) || options[0];
 
   return (
-    <View style={styles.container}>
-      {/* Button showing selected option icon + text */}
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() => setOpen((prev) => !prev)}
-        activeOpacity={0.8}
-      >
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          {selectedOption.icon}
-          <Text style={[styles.buttonText, { marginLeft: 6 }]}>
-            {selectedOption.label}
-          </Text>
-        </View>
-        {open ? (
-          <View style={{ paddingLeft: 3 }}>
-            <ChevronUp size={16} color={colors.text} />
+    <SafeAreaView>
+      <View style={styles.container}>
+        {/* Button showing selected option icon + text */}
+        <TouchableOpacity
+          style={styles.button}
+          onPress={() => setOpen((prev) => !prev)}
+          activeOpacity={0.8}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            {selectedOption.icon}
+            <Text style={[styles.buttonText, { marginLeft: 6 }]}>
+              {selectedOption.label}
+            </Text>
           </View>
-        ) : (
-          <View style={{ paddingLeft: 3 }}>
-            <ChevronDown size={16} color={colors.text} />
+          {open ? (
+            <View style={{ paddingLeft: 3 }}>
+              <ChevronUp size={16} color={colors.text} />
+            </View>
+          ) : (
+            <View style={{ paddingLeft: 3 }}>
+              <ChevronDown size={16} color={colors.text} />
+            </View>
+          )}
+        </TouchableOpacity>
+
+        {open && (
+          <View style={styles.dropdownWrapper}>
+            <View style={styles.dropdown}>
+              {options.map((option) => (
+                <TouchableOpacity
+                  key={option.key}
+                  style={styles.option}
+                  onPress={() => {
+                    setSortBy(option.key);
+                    setOpen(false);
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    {option.icon}
+                    <Text style={[styles.optionText, { marginLeft: 6 }]}>
+                      {option.label}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         )}
-      </TouchableOpacity>
-
-      {open && (
-        <View style={styles.dropdownWrapper}>
-          <View style={styles.dropdown}>
-            {options.map((option) => (
-              <TouchableOpacity
-                key={option.key}
-                style={styles.option}
-                onPress={() => {
-                  setSortBy(option.key);
-                  setOpen(false);
-                }}
-                activeOpacity={0.7}
-              >
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  {option.icon}
-                  <Text style={[styles.optionText, { marginLeft: 6 }]}>
-                    {option.label}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-      )}
-    </View>
+      </View>
+    </SafeAreaView>
   );
 };
 
@@ -97,50 +105,60 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
     marginBottom: 12,
     paddingHorizontal: 20,
-    zIndex: 10,
+    zIndex: 100,
+    elevation: 100,
   },
+
   button: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between", // icon+text on left, chevron on right
+    justifyContent: "space-between",
     backgroundColor: colors.backgroundCard,
-    borderRadius: 8,
-    paddingHorizontal: 12,
+    borderRadius: 10,
+    paddingHorizontal: 14,
     paddingVertical: 8,
   },
+
   buttonText: {
     color: colors.text,
+    fontWeight: "500",
   },
+
   dropdownWrapper: {
     position: "absolute",
     top: 48,
-    right: 0,
-    zIndex: 999,
-    elevation: 10,
+    right: 20,
+    zIndex: 1000,
+    elevation: 1000,
   },
+
   dropdown: {
-    backgroundColor: colors.backgroundCard,
-    borderRadius: 8,
-    overflow: "hidden",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 5,
-    borderWidth: 1,
-    borderColor: colors.backgroundAlt,
-    padding: 6,
+    backgroundColor: colors.backgroundAlt,
+    borderRadius: 12,
+    padding: 8,
+    marginTop: -10,
+    // removed outer border
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    elevation: 8,
   },
+
   option: {
     paddingVertical: 10,
     paddingHorizontal: 12,
+    borderRadius: 8,
+    marginBottom: 6,
+
+    backgroundColor: colors.background,
     borderWidth: 1,
     borderColor: colors.backgroundAlt,
-    borderRadius: 6,
-    marginBottom: 4,
   },
+
   optionText: {
     color: colors.text,
+    fontWeight: "500",
   },
 });
 
