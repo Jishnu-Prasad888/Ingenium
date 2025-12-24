@@ -36,7 +36,8 @@ interface AppContextType {
   flushPendingSaves: () => Promise<void>;
   loadData: () => Promise<void>;
   performInitialSync: () => Promise<void>;
-  deleteNote: (id: string) => Promise<boolean>; // Add this line
+  deleteNote: (id: string) => Promise<boolean>;
+  deleteFolder: (id: string) => Promise<boolean>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -315,6 +316,67 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     [currentFolderId]
   );
 
+  // Delete note function
+  const deleteNote = useCallback(
+    async (id: string): Promise<boolean> => {
+      try {
+        // Remove from local state
+        setNotes((prev) => prev.filter((note) => note.id !== id));
+
+        // Delete from database
+        await StorageService.deleteNote(id);
+
+        // If this was the current note, navigate away
+        if (currentNoteId === id) {
+          setCurrentNoteId(null);
+          setCurrentScreen("notes-list");
+        }
+
+        return true;
+      } catch (error) {
+        console.error("Error deleting note:", error);
+        return false;
+      }
+    },
+    [currentNoteId]
+  );
+
+  // Delete folder function
+  const deleteFolder = useCallback(
+    async (id: string): Promise<boolean> => {
+      try {
+        // Remove folder from local state
+        setFolders((prev) => prev.filter((folder) => folder.id !== id));
+
+        // Delete folder from database
+        await StorageService.deleteFolder(id);
+
+        // Delete all notes in this folder
+        const notesInFolder = notes.filter((note) => note.folderId === id);
+
+        // Remove notes from local state
+        setNotes((prev) => prev.filter((note) => note.folderId !== id));
+
+        // Delete notes from database
+        for (const note of notesInFolder) {
+          await StorageService.deleteNote(note.id);
+        }
+
+        // If we're in this folder, navigate to parent
+        if (currentFolderId === id) {
+          const folder = folders.find((f) => f.id === id);
+          setCurrentFolderId(folder?.parentId || null);
+        }
+
+        return true;
+      } catch (error) {
+        console.error("Error deleting folder:", error);
+        return false;
+      }
+    },
+    [currentFolderId, folders, notes]
+  );
+
   // Get current path function
   const getCurrentPath = useCallback(() => {
     if (!currentFolderId) return "/";
@@ -415,30 +477,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     [searchQuery, sortBy]
   );
 
-  const deleteNote = useCallback(
-    async (id: string): Promise<boolean> => {
-      try {
-        // Remove from local state
-        setNotes((prev) => prev.filter((note) => note.id !== id));
-
-        // Delete from database
-        await StorageService.deleteNote(id);
-
-        // If this was the current note, navigate away
-        if (currentNoteId === id) {
-          setCurrentNoteId(null);
-          setCurrentScreen("notes-list");
-        }
-
-        return true;
-      } catch (error) {
-        console.error("Error deleting note:", error);
-        return false;
-      }
-    },
-    [currentNoteId]
-  );
-
   const value: AppContextType = {
     folders,
     notes,
@@ -464,6 +502,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     loadData,
     performInitialSync,
     deleteNote,
+    deleteFolder, // Add this to the value object
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
