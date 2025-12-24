@@ -104,7 +104,14 @@ const FolderExplorerScreen: React.FC = () => {
         </Text>
       </View>
 
-      <ScrollView style={{ flex: 1, paddingHorizontal: 20 }}>
+      <ScrollView
+        style={{
+          flex: 1,
+          paddingHorizontal: 20,
+          marginBottom: 2,
+          borderRadius: 10,
+        }}
+      >
         {currentFolderNotes.map((note) => (
           <NoteCard key={note.id} note={note} />
         ))}

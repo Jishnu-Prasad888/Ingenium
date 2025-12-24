@@ -10,6 +10,23 @@ interface NoteCardProps {
   note: Note;
 }
 
+const facts = [
+  "Octopuses have three hearts.",
+  "Bananas are berries, but strawberries are not.",
+  "Honey never spoils.",
+  "A day on Venus is longer than a year on Venus.",
+  "Wombat poop is cube-shaped.",
+  "There are more stars in the universe than grains of sand on Earth.",
+  "Sharks existed before trees.",
+  "The human brain uses about 20% of the body’s energy.",
+  "Butterflies remember being caterpillars.",
+  "The Eiffel Tower grows taller in summer.",
+];
+function getRandomFact() {
+  const index = Math.floor(Math.random() * facts.length);
+  return facts[index];
+}
+
 const NoteCard: React.FC<NoteCardProps> = ({ note }) => {
   const { setCurrentNoteId, setCurrentScreen } = useApp();
 
@@ -17,6 +34,8 @@ const NoteCard: React.FC<NoteCardProps> = ({ note }) => {
   const content =
     note?.content && typeof note.content === "string" ? note.content : "";
   const createdAt = note?.createdAt ? note.createdAt : Date.now();
+  const isEmpty = !content?.trim();
+  const randomFact = facts[Math.floor(Math.random() * facts.length)];
 
   return (
     <TouchableOpacity
@@ -37,7 +56,7 @@ const NoteCard: React.FC<NoteCardProps> = ({ note }) => {
         style={{
           flexDirection: "row",
           justifyContent: "space-between",
-          alignItems: "flex-start",
+          alignItems: "center",
         }}
       >
         <View style={{ flex: 1 }}>
@@ -60,11 +79,59 @@ const NoteCard: React.FC<NoteCardProps> = ({ note }) => {
           >
             {formatDate(createdAt)}
           </Text>
-          <Text style={{ fontSize: 14, color: colors.text }} numberOfLines={2}>
-            {content || "No content"}
-          </Text>
+          {isEmpty ? (
+            <View>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: colors.text,
+                  fontStyle: "italic",
+                  fontFamily: "serif",
+                  opacity: 0.5,
+                }}
+                numberOfLines={2}
+              >
+                Did You Know ! {randomFact}
+              </Text>
+              <Text
+                style={{
+                  fontSize: 12,
+                  color: colors.text,
+                  fontStyle: "italic",
+                  fontFamily: "serif",
+                  opacity: 0.5,
+                  paddingTop: 1,
+                }}
+              >
+                waiting to hear form you now :)
+              </Text>
+            </View>
+          ) : (
+            <Text
+              style={{
+                fontSize: 12,
+                color: colors.text,
+                fontFamily: "serif",
+              }}
+            >
+              {content}
+            </Text>
+          )}
+
+          {/* <Text
+            style={{
+              fontSize: 14,
+              color: colors.text,
+              fontStyle: isEmpty ? "italic" : "normal",
+            }}
+            numberOfLines={2}
+          >
+            {isEmpty ? randomFact : content}
+          </Text> */}
         </View>
-        <CircleChevronRight size={24} color={colors.text} />
+        <View style={{ alignItems: "center" }}>
+          <CircleChevronRight size={24} color={colors.text} />
+        </View>
       </View>
     </TouchableOpacity>
   );

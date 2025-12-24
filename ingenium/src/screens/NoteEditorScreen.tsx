@@ -77,15 +77,16 @@ const NoteEditorScreen: React.FC = () => {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Header />
 
-      <ScrollView style={{ flex: 1, paddingHorizontal: 20 }}>
+      <View style={{ flex: 1, paddingHorizontal: 20, marginBottom: 10 }}>
         <View
           style={{
+            flex: 1,
             backgroundColor: colors.backgroundCard,
             borderRadius: 12,
             padding: 20,
-            marginBottom: 16,
           }}
         >
+          {/* Title */}
           <TextInput
             style={{
               fontSize: 32,
@@ -102,11 +103,12 @@ const NoteEditorScreen: React.FC = () => {
             placeholderTextColor={colors.textSecondary}
           />
 
+          {/* Meta */}
           <View
             style={{
               flexDirection: "row",
               justifyContent: "space-between",
-              marginBottom: 16,
+              marginBottom: 12,
             }}
           >
             <Text style={{ fontSize: 12, color: colors.textSecondary }}>
@@ -117,63 +119,101 @@ const NoteEditorScreen: React.FC = () => {
             </Text>
           </View>
 
-          <TextInput
-            style={{
-              fontSize: 16,
-              color: colors.text,
-              minHeight: 300,
-              textAlignVertical: "top",
-            }}
-            value={content}
-            onChangeText={(text) => updateNote(note.id, { content: text })}
-            multiline
-            placeholder="Start writing..."
-            placeholderTextColor={colors.textSecondary}
-          />
+          {/* Scrollable content */}
+          <ScrollView
+            style={{ flex: 1 }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <TextInput
+              style={{
+                fontSize: 16,
+                color: colors.text,
+                textAlignVertical: "top",
+                minHeight: 250,
+                marginBottom: 120,
+              }}
+              value={content}
+              onChangeText={(text) => updateNote(note.id, { content: text })}
+              multiline
+              placeholder="Start writing..."
+              placeholderTextColor={colors.textSecondary}
+            />
+          </ScrollView>
         </View>
-
-        <View style={{ height: 100 }} />
-      </ScrollView>
+      </View>
 
       <View
         style={{
-          flexDirection: "row",
-          justifyContent: "center",
           paddingHorizontal: 20,
-          paddingBottom: 16,
+          paddingBottom: 112,
+          flexDirection: "row",
+          alignItems: "center",
+          alignContent: "center",
+          justifyContent: "center",
         }}
       >
         <TouchableOpacity
           style={{
             flex: 1,
-            backgroundColor: colors.backgroundFolder,
+            backgroundColor: colors.backgroundCard,
             borderRadius: 12,
-            padding: 16,
-            marginRight: 8,
+            paddingLeft: 10,
+            paddingRight: 20,
+            marginRight: 10,
+            height: 45,
             alignItems: "center",
             flexDirection: "row",
             justifyContent: "center",
+            shadowColor: colors.shadow,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 4,
+            elevation: 2,
           }}
           onPress={() => {
             setCurrentScreen("notes-list");
           }}
         >
           <ChevronLeft size={20} color={colors.text} />
-          <Text style={{ marginLeft: 8, fontSize: 16, color: colors.text }}>
+          <Text
+            style={{
+              fontSize: 16,
+              color: colors.text,
+              paddingLeft: 10,
+              textAlign: "center",
+            }}
+          >
             Back
           </Text>
         </TouchableOpacity>
-        <View style={{ width: 2, backgroundColor: colors.text }} />
+        <View
+          style={{
+            width: 3,
+            backgroundColor: colors.primary,
+            opacity: 1,
+            height: 34,
+            borderRadius: 12,
+          }}
+        />
+
         <TouchableOpacity
           style={{
             flex: 1,
-            backgroundColor: colors.backgroundFolder,
+            backgroundColor: colors.backgroundCard,
             borderRadius: 12,
-            padding: 16,
-            marginLeft: 8,
+            paddingLeft: 10,
+            paddingRight: 20,
+            marginLeft: 10,
+            height: 45,
             alignItems: "center",
             flexDirection: "row",
             justifyContent: "center",
+            shadowColor: colors.shadow,
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.1,
+            shadowRadius: 4,
+            elevation: 2,
           }}
           onPress={handleShare}
         >
