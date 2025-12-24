@@ -34,8 +34,9 @@ interface AppContextType {
   getFilteredAndSortedItems: (items: any[], type: "note" | "folder") => any[];
   debouncedUpdateNote: (id: string, updates: Partial<Note>) => void;
   flushPendingSaves: () => Promise<void>;
-  loadData: () => Promise<void>; // Add this
-  performInitialSync: () => Promise<void>; // Add this
+  loadData: () => Promise<void>;
+  performInitialSync: () => Promise<void>;
+  deleteNote: (id: string) => Promise<boolean>; // Add this line
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -414,6 +415,30 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     [searchQuery, sortBy]
   );
 
+  const deleteNote = useCallback(
+    async (id: string): Promise<boolean> => {
+      try {
+        // Remove from local state
+        setNotes((prev) => prev.filter((note) => note.id !== id));
+
+        // Delete from database
+        await StorageService.deleteNote(id);
+
+        // If this was the current note, navigate away
+        if (currentNoteId === id) {
+          setCurrentNoteId(null);
+          setCurrentScreen("notes-list");
+        }
+
+        return true;
+      } catch (error) {
+        console.error("Error deleting note:", error);
+        return false;
+      }
+    },
+    [currentNoteId]
+  );
+
   const value: AppContextType = {
     folders,
     notes,
@@ -438,6 +463,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     flushPendingSaves,
     loadData,
     performInitialSync,
+    deleteNote,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
