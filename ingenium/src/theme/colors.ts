@@ -11,6 +11,9 @@ export const colors = {
     border: '#D4A574',
     white: '#FFFFFF',
     shadow: 'rgba(44, 24, 16, 0.1)',
-    error : 'rgba(255,0,0,255),'
+    error : 'rgba(255,0,0,255)',
+    warning: "#FFA500", // Add this line for warning/orange color
+    success: "#4CAF50", // Optional: add success color too
+    info: "#2196F3", // Optional: add info color
 
 };

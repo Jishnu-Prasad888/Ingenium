@@ -1,3 +1,4 @@
+// context/AppContext.tsx
 import React, {
   createContext,
   useContext,
@@ -7,16 +8,10 @@ import React, {
   useRef,
   useCallback,
 } from "react";
-import {
-  AppState,
-  AppStateStatus,
-  Platform,
-  BackHandler,
-  Alert,
-} from "react-native";
 import StorageService, { Folder, Note } from "../services/StorageService";
 import SyncService from "../services/SyncService";
 import { generateSyncId } from "../utils/helpers";
+
 interface AppContextType {
   folders: Folder[];
   notes: Note[];
@@ -31,14 +26,16 @@ interface AppContextType {
   sortBy: string;
   setSortBy: (sort: string) => void;
   isSyncing: boolean;
-  createFolder: (name: string, parentId?: string | null) => void;
-  createNote: (folderId?: string | null) => void;
+  createFolder: (name: string, parentId?: string | null) => Promise<void>;
+  createNote: (folderId?: string | null) => Promise<void>;
   updateNote: (id: string, updates: Partial<Note>) => void;
+  updateNoteImmediate: (id: string, updates: Partial<Note>) => Promise<void>;
   getCurrentPath: () => string;
   getFilteredAndSortedItems: (items: any[], type: "note" | "folder") => any[];
-  ensureDataSaved: () => Promise<void>;
-  exportData: () => Promise<string>;
-  importData: (jsonData: string) => Promise<void>;
+  debouncedUpdateNote: (id: string, updates: Partial<Note>) => void;
+  flushPendingSaves: () => Promise<void>;
+  loadData: () => Promise<void>; // Add this
+  performInitialSync: () => Promise<void>; // Add this
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -55,220 +52,270 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   const [sortBy, setSortBy] = useState("date-desc");
   const [isSyncing, setIsSyncing] = useState(false);
 
+  // Refs for debouncing
+  const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pendingUpdatesRef = useRef<Map<string, Partial<Note>>>(new Map());
   const isSavingRef = useRef(false);
-  const appStateRef = useRef(AppState.currentState);
-  const isExitingRef = useRef(false);
+
+  // Load data function
+  const loadData = useCallback(async () => {
+    try {
+      const loadedFolders = await StorageService.getFolders();
+      const loadedNotes = await StorageService.getNotes();
+      setFolders(loadedFolders);
+      setNotes((prev) => {
+        const map = new Map<string, Note>();
+
+        // existing notes
+        prev.forEach((n) => map.set(n.id, n));
+
+        // loaded notes
+        loadedNotes.forEach((n) => map.set(n.id, n));
+
+        return Array.from(map.values());
+      });
+    } catch (error) {
+      console.error("Error loading data:", error);
+    }
+  }, []);
+
+  // Initial sync function
+  const performInitialSync = useCallback(async () => {
+    setIsSyncing(true);
+    try {
+      await SyncService.fullSync();
+      await loadData();
+    } catch (error) {
+      console.error("Error during initial sync:", error);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [loadData]);
 
   useEffect(() => {
     loadData();
     performInitialSync();
-    setupAppStateListeners();
 
-    // Initialize storage service
-    StorageService.initialize();
-
+    // Cleanup on unmount
     return () => {
-      cleanup();
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+      // Save any pending updates before unmounting
+      flushPendingSaves();
     };
   }, []);
 
-  const setupAppStateListeners = () => {
-    // Listen for app state changes
-    const subscription = AppState.addEventListener(
-      "change",
-      handleAppStateChange
-    );
-
-    // Handle hardware back button on Android
-    if (Platform.OS === "android") {
-      const backHandler = BackHandler.addEventListener(
-        "hardwareBackPress",
-        handleBackPress
-      );
-      return () => {
-        subscription.remove();
-        backHandler.remove();
-      };
+  // Function to flush all pending saves
+  const flushPendingSaves = useCallback(async (): Promise<void> => {
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = null;
     }
 
-    return () => subscription.remove();
-  };
+    if (pendingUpdatesRef.current.size === 0 || isSavingRef.current) {
+      return;
+    }
 
-  const handleAppStateChange = useCallback(
-    async (nextAppState: AppStateStatus) => {
-      if (
-        appStateRef.current.match(/inactive|background/) &&
-        nextAppState === "active"
-      ) {
-        // App coming to foreground
-        console.log("App has come to the foreground");
-        await loadData();
-      } else if (nextAppState.match(/inactive|background/)) {
-        // App going to background
-        console.log("App is going to the background");
-        await ensureAllDataSaved();
+    isSavingRef.current = true;
+
+    try {
+      console.log(
+        `Flushing ${pendingUpdatesRef.current.size} pending updates...`
+      );
+
+      // Process all pending updates
+      const updates = Array.from(pendingUpdatesRef.current.entries());
+      pendingUpdatesRef.current.clear();
+
+      for (const [noteId, updateData] of updates) {
+        const note = notes.find((n) => n.id === noteId);
+        if (note) {
+          const updatedNote: Note = {
+            ...note,
+            ...updateData,
+            updatedAt: Date.now(),
+            syncStatus: "pending",
+            title:
+              typeof updateData.title === "string"
+                ? updateData.title.trim()
+                : note.title,
+          };
+
+          // Update local state
+          setNotes((prev) =>
+            prev.map((n) => (n.id === noteId ? updatedNote : n))
+          );
+
+          // Save to database
+          await StorageService.saveNote(updatedNote);
+        }
       }
 
-      appStateRef.current = nextAppState;
+      console.log("All pending updates saved");
+    } catch (error) {
+      console.error("Error flushing pending saves:", error);
+    } finally {
+      isSavingRef.current = false;
+    }
+  }, [notes]);
+
+  // Debounced updateNote function
+  const debouncedUpdateNote = useCallback(
+    (id: string, updates: Partial<Note>) => {
+      // Update local state immediately for responsive UI
+      setNotes((prev) =>
+        prev.map((note) =>
+          note.id === id
+            ? {
+                ...note,
+                ...updates,
+                updatedAt: Date.now(),
+                syncStatus: "pending",
+                title:
+                  typeof updates.title === "string"
+                    ? updates.title.trim()
+                    : note.title,
+              }
+            : note
+        )
+      );
+
+      // Store the update for later saving
+      if (pendingUpdatesRef.current.has(id)) {
+        const existing = pendingUpdatesRef.current.get(id)!;
+        pendingUpdatesRef.current.set(id, { ...existing, ...updates });
+      } else {
+        pendingUpdatesRef.current.set(id, updates);
+      }
+
+      // Clear any existing timeout
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+
+      // Set new timeout for 500ms
+      saveTimeoutRef.current = setTimeout(async () => {
+        await flushPendingSaves();
+      }, 500);
+    },
+    [flushPendingSaves]
+  );
+
+  // Immediate update (for when user navigates away or explicitly saves)
+  const updateNoteImmediate = useCallback(
+    async (id: string, updates: Partial<Note>) => {
+      // Cancel any pending debounced save for this note
+      if (pendingUpdatesRef.current.has(id)) {
+        pendingUpdatesRef.current.delete(id);
+      }
+
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+      }
+
+      // Update state immediately
+      setNotes((prev) =>
+        prev.map((note) =>
+          note.id === id
+            ? {
+                ...note,
+                ...updates,
+                updatedAt: Date.now(),
+                syncStatus: "pending",
+                title:
+                  typeof updates.title === "string"
+                    ? updates.title.trim()
+                    : note.title,
+              }
+            : note
+        )
+      );
+
+      // Save immediately
+      const updated = notes.find((n) => n.id === id);
+      if (updated) {
+        const finalNote = {
+          ...updated,
+          ...updates,
+          updatedAt: Date.now(),
+          syncStatus: "pending",
+          title:
+            typeof updates.title === "string"
+              ? updates.title.trim()
+              : updated.title,
+        };
+        await StorageService.saveNote(finalNote);
+      }
+    },
+    [notes]
+  );
+
+  // Keep the original updateNote for backward compatibility (immediate save)
+  const updateNote = useCallback(
+    (id: string, updates: Partial<Note>) => {
+      // Default to immediate save for non-typing updates
+      updateNoteImmediate(id, updates);
+    },
+    [updateNoteImmediate]
+  );
+
+  // Create folder function
+  const createFolder = useCallback(
+    async (name: string, parentId: string | null = null) => {
+      if (!name || !name.trim()) return;
+
+      const newFolder: Folder = {
+        id: generateSyncId(),
+        name: name.trim(),
+        parentId,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        syncStatus: "pending",
+      };
+
+      // Update state first
+      setFolders((prev) => {
+        if (prev.some((f) => f.id === newFolder.id)) return prev;
+        return [...prev, newFolder];
+      });
+
+      // Save to database
+      await StorageService.saveFolder(newFolder);
     },
     []
   );
 
-  const handleBackPress = useCallback(() => {
-    if (
-      currentScreen === "note-editor" ||
-      currentScreen === "folder-explorer"
-    ) {
-      // Save data before navigating back
-      ensureAllDataSaved().then(() => {
-        // Navigate back based on current screen
-        if (currentScreen === "note-editor") {
-          setCurrentScreen("notes-list");
-        } else if (currentScreen === "folder-explorer") {
-          const parent = folders.find((f) => f.id === currentFolderId);
-          setCurrentFolderId(parent?.parentId || null);
+  // Create note function
+  const createNote = useCallback(
+    async (folderId: string | null = null) => {
+      const newNote: Note = {
+        id: generateSyncId(),
+        folderId: folderId || currentFolderId,
+        title: "Untitled Note",
+        content: "",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        syncStatus: "pending",
+      };
+
+      setNotes((prev) => {
+        if (prev.some((n) => n.id === newNote.id)) {
+          return prev;
         }
+        return [...prev, newNote];
       });
-      return true; // Prevent default back behavior
-    }
-    return false;
-  }, [currentScreen, currentFolderId, folders]);
 
-  // Ensure all data is saved
-  const ensureAllDataSaved = async (): Promise<void> => {
-    if (isSavingRef.current) return;
+      await StorageService.saveNote(newNote);
+      setCurrentNoteId(newNote.id);
+      setCurrentScreen("note-editor");
+    },
+    [currentFolderId]
+  );
 
-    isSavingRef.current = true;
-    try {
-      console.log("Ensuring all data is saved...");
-      await StorageService.ensureDataSaved();
-      console.log("All data saved successfully");
-    } catch (error) {
-      console.error("Error saving data:", error);
-    } finally {
-      isSavingRef.current = false;
-    }
-  };
-
-  // Handle app exit/cleanup
-  const cleanup = async () => {
-    if (isExitingRef.current) return;
-
-    isExitingRef.current = true;
-    console.log("Performing cleanup before exit...");
-
-    try {
-      await ensureAllDataSaved();
-      // Optionally perform a final sync
-      await SyncService.quickSync();
-    } catch (error) {
-      console.error("Error during cleanup:", error);
-    }
-  };
-
-  const loadData = async () => {
-    const loadedFolders = await StorageService.getFolders();
-    const loadedNotes = await StorageService.getNotes();
-    setFolders(loadedFolders);
-    setNotes((prev) => {
-      const map = new Map<string, Note>();
-
-      // existing notes
-      prev.forEach((n) => map.set(n.id, n));
-
-      // loaded notes
-      loadedNotes.forEach((n) => map.set(n.id, n));
-
-      return Array.from(map.values());
-    });
-  };
-
-  const performInitialSync = async () => {
-    setIsSyncing(true);
-    await SyncService.fullSync();
-    await loadData();
-    setIsSyncing(false);
-  };
-
-  // Update createFolder to ensure immediate save
-  const createFolder = async (name: string, parentId: string | null = null) => {
-    if (!name || !name.trim()) return;
-
-    const newFolder: Folder = {
-      id: generateSyncId(),
-      name: name.trim(),
-      parentId,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      syncStatus: "pending",
-    };
-
-    // Update state first
-    setFolders((prev) => {
-      if (prev.some((f) => f.id === newFolder.id)) return prev;
-      return [...prev, newFolder];
-    });
-
-    // Save to database
-    await StorageService.saveFolder(newFolder);
-
-    // Ensure immediate persistence
-    await ensureAllDataSaved();
-  };
-
-  // Update createNote to ensure immediate save
-  const createNote = async (folderId: string | null = null) => {
-    const newNote: Note = {
-      id: generateSyncId(),
-      folderId: folderId || currentFolderId,
-      title: "Untitled Note",
-      content: "",
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      syncStatus: "pending",
-    };
-
-    setNotes((prev) => {
-      if (prev.some((n) => n.id === newNote.id)) {
-        return prev;
-      }
-      return [...prev, newNote];
-    });
-
-    await StorageService.saveNote(newNote);
-    await ensureAllDataSaved();
-
-    setCurrentNoteId(newNote.id);
-    setCurrentScreen("note-editor");
-  };
-
-  // Update updateNote to ensure immediate save
-  const updateNote = async (id: string, updates: Partial<Note>) => {
-    const updatedNotes = notes.map((note) =>
-      note.id === id
-        ? {
-            ...note,
-            ...updates,
-            updatedAt: Date.now(),
-            syncStatus: "pending",
-            title:
-              typeof updates.title === "string"
-                ? updates.title.trim()
-                : note.title,
-          }
-        : note
-    );
-
-    setNotes(updatedNotes);
-
-    const updated = updatedNotes.find((n) => n.id === id);
-    if (updated) {
-      await StorageService.saveNote(updated);
-      await ensureAllDataSaved();
-    }
-  };
-
-  const getCurrentPath = () => {
+  // Get current path function
+  const getCurrentPath = useCallback(() => {
     if (!currentFolderId) return "/";
 
     const path: string[] = [];
@@ -283,81 +330,89 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     }
 
     return "/" + path.join("/");
-  };
+  }, [currentFolderId, folders]);
 
-  const getFilteredAndSortedItems = (items: any[], type: "note" | "folder") => {
-    let filtered = items;
+  // Get filtered and sorted items function
+  const getFilteredAndSortedItems = useCallback(
+    (items: any[], type: "note" | "folder") => {
+      let filtered = items;
 
-    if (searchQuery && typeof searchQuery === "string" && searchQuery.trim()) {
-      const searchLower = searchQuery.toLowerCase().trim();
-      filtered = items.filter((item) => {
-        if (type === "note") {
-          const title =
-            item.title && typeof item.title === "string"
-              ? item.title.toLowerCase()
-              : "";
-          const content =
-            item.content && typeof item.content === "string"
-              ? item.content.toLowerCase()
-              : "";
-          return title.includes(searchLower) || content.includes(searchLower);
-        } else {
-          const name =
-            item.name && typeof item.name === "string"
-              ? item.name.toLowerCase()
-              : "";
-          return name.includes(searchLower);
+      if (
+        searchQuery &&
+        typeof searchQuery === "string" &&
+        searchQuery.trim()
+      ) {
+        const searchLower = searchQuery.toLowerCase().trim();
+        filtered = items.filter((item) => {
+          if (type === "note") {
+            const title =
+              item.title && typeof item.title === "string"
+                ? item.title.toLowerCase()
+                : "";
+            const content =
+              item.content && typeof item.content === "string"
+                ? item.content.toLowerCase()
+                : "";
+            return title.includes(searchLower) || content.includes(searchLower);
+          } else {
+            const name =
+              item.name && typeof item.name === "string"
+                ? item.name.toLowerCase()
+                : "";
+            return name.includes(searchLower);
+          }
+        });
+      }
+
+      return filtered.sort((a, b) => {
+        switch (sortBy) {
+          case "date-asc":
+            return (a.createdAt || 0) - (b.createdAt || 0);
+          case "date-desc":
+            return (b.createdAt || 0) - (a.createdAt || 0);
+          case "alpha-asc":
+            const nameA =
+              type === "note"
+                ? a.title && typeof a.title === "string"
+                  ? a.title
+                  : ""
+                : a.name && typeof a.name === "string"
+                ? a.name
+                : "";
+            const nameB =
+              type === "note"
+                ? b.title && typeof b.title === "string"
+                  ? b.title
+                  : ""
+                : b.name && typeof b.name === "string"
+                ? b.name
+                : "";
+            return nameA.localeCompare(nameB);
+          case "alpha-desc":
+            const nameA2 =
+              type === "note"
+                ? a.title && typeof a.title === "string"
+                  ? a.title
+                  : ""
+                : a.name && typeof a.name === "string"
+                ? a.name
+                : "";
+            const nameB2 =
+              type === "note"
+                ? b.title && typeof b.title === "string"
+                  ? b.title
+                  : ""
+                : b.name && typeof b.name === "string"
+                ? b.name
+                : "";
+            return nameB2.localeCompare(nameA2);
+          default:
+            return 0;
         }
       });
-    }
-
-    return filtered.sort((a, b) => {
-      switch (sortBy) {
-        case "date-asc":
-          return (a.createdAt || 0) - (b.createdAt || 0);
-        case "date-desc":
-          return (b.createdAt || 0) - (a.createdAt || 0);
-        case "alpha-asc":
-          const nameA =
-            type === "note"
-              ? a.title && typeof a.title === "string"
-                ? a.title
-                : ""
-              : a.name && typeof a.name === "string"
-              ? a.name
-              : "";
-          const nameB =
-            type === "note"
-              ? b.title && typeof b.title === "string"
-                ? b.title
-                : ""
-              : b.name && typeof b.name === "string"
-              ? b.name
-              : "";
-          return nameA.localeCompare(nameB);
-        case "alpha-desc":
-          const nameA2 =
-            type === "note"
-              ? a.title && typeof a.title === "string"
-                ? a.title
-                : ""
-              : a.name && typeof a.name === "string"
-              ? a.name
-              : "";
-          const nameB2 =
-            type === "note"
-              ? b.title && typeof b.title === "string"
-                ? b.title
-                : ""
-              : b.name && typeof b.name === "string"
-              ? b.name
-              : "";
-          return nameB2.localeCompare(nameA2);
-        default:
-          return 0;
-      }
-    });
-  };
+    },
+    [searchQuery, sortBy]
+  );
 
   const value: AppContextType = {
     folders,
@@ -376,11 +431,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     createFolder,
     createNote,
     updateNote,
+    updateNoteImmediate,
     getCurrentPath,
     getFilteredAndSortedItems,
-    ensureDataSaved: ensureAllDataSaved,
-    exportData: StorageService.exportData,
-    importData: StorageService.importData,
+    debouncedUpdateNote,
+    flushPendingSaves,
+    loadData,
+    performInitialSync,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
