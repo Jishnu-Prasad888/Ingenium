@@ -1,6 +1,12 @@
-import React, { useRef } from "react";
-import { View, ScrollView, TouchableOpacity, Text } from "react-native";
-import { Plus } from "lucide-react-native";
+import React, { useEffect, useRef } from "react";
+import {
+  View,
+  ScrollView,
+  TouchableOpacity,
+  Text,
+  Animated,
+} from "react-native";
+import { Plus, NotebookPen } from "lucide-react-native";
 import { useApp } from "../context/AppContext";
 import Header from "../components/Header";
 import SearchBar from "../components/SearchBar";
@@ -9,6 +15,7 @@ import NoteCard from "../components/NoteCard";
 import Divider from "../components/Divider";
 import ScrollToTopButton from "../components/ScrollToTopButton";
 import { colors } from "../theme/colors";
+import { EmptyNotesState } from "../components/EmptyNotesState";
 
 const NotesListScreen: React.FC = () => {
   const { notes, createNote, getFilteredAndSortedItems } = useApp();
@@ -48,12 +55,16 @@ const NotesListScreen: React.FC = () => {
 
       <Divider text="Your notes here" />
 
-      <ScrollView ref={scrollRef} style={{ flex: 1, paddingHorizontal: 20 }}>
-        {allNotes.map((note) => (
-          <NoteCard key={note.id} note={note} />
-        ))}
-        <View style={{ height: 100 }} />
-      </ScrollView>
+      {allNotes.length > 0 ? (
+        <ScrollView ref={scrollRef} style={{ flex: 1, paddingHorizontal: 20 }}>
+          {allNotes.map((note) => (
+            <NoteCard key={note.id} note={note} />
+          ))}
+          <View style={{ height: 100 }} />
+        </ScrollView>
+      ) : (
+        <EmptyNotesState />
+      )}
 
       <ScrollToTopButton scrollRef={scrollRef} />
     </View>
