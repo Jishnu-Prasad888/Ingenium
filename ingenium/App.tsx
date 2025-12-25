@@ -1,24 +1,22 @@
 // App.tsx
 import React, { useEffect, useState } from "react";
 import { View, ActivityIndicator, Text } from "react-native";
-import { AppProvider } from "./src/context/AppContext";
+import { AppProvider, useApp } from "./src/context/AppContext";
 import { colors } from "./src/theme/colors";
 import StorageService from "./src/services/StorageService";
 import { AppContent } from "./src/components/AppContent";
+import { useShareIntent } from "expo-share-intent";
 
-// Wrapper that lazy-loads AppContent
-// Wrapper that lazy-loads AppContent
-const AppWrapper: React.FC = () => {
-  return <AppContent />;
-};
+// Simple wrapper, just renders AppContent
+const AppWrapper: React.FC = () => <AppContent />;
 
-// Main App component
 const IngeniumApp: React.FC = () => {
   const [databaseInitialized, setDatabaseInitialized] = useState(false);
   const [initializationError, setInitializationError] = useState<string | null>(
     null
   );
 
+  // Initialize SQLite database
   useEffect(() => {
     const initializeApp = async () => {
       try {
@@ -31,8 +29,7 @@ const IngeniumApp: React.FC = () => {
         setInitializationError(
           "Failed to initialize database. Please restart the app."
         );
-        // Allow app to continue even if DB fails
-        setDatabaseInitialized(true);
+        setDatabaseInitialized(true); // allow app to continue
       }
     };
 
@@ -81,8 +78,25 @@ const IngeniumApp: React.FC = () => {
     );
   }
 
+  // Listener for shared content from other apps
+  const ShareIntentListener: React.FC = () => {
+    const { processIncomingShare } = useApp();
+    const { hasShareIntent, shareIntent } = useShareIntent({
+      resetOnBackground: true,
+    });
+
+    useEffect(() => {
+      if (hasShareIntent && shareIntent?.text) {
+        processIncomingShare(shareIntent.text);
+      }
+    }, [hasShareIntent, shareIntent]);
+
+    return null;
+  };
+
   return (
     <AppProvider>
+      <ShareIntentListener />
       <AppWrapper />
     </AppProvider>
   );
