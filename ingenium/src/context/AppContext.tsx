@@ -11,6 +11,8 @@ import React, {
 import StorageService, { Folder, Note } from "../services/StorageService";
 import SyncService from "../services/SyncService";
 import { generateSyncId } from "../utils/helpers";
+import * as Linking from "expo-linking";
+import { Alert } from "react-native";
 
 interface AppContextType {
   folders: Folder[];
@@ -42,7 +44,8 @@ interface AppContextType {
   setSharedContent: (content: string) => void;
   isSharing: boolean;
   setIsSharing: (sharing: boolean) => void;
-  processIncomingShare?: (url: string) => void;
+  processIncomingShare: (content: string) => Promise<void>;
+  clearSharedContent: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -116,7 +119,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     };
   }, []);
 
-  const processIncomingShare = useCallback((url: string) => {}, []);
+  const processIncomingShare = useCallback(async (content: string) => {
+    try {
+      if (!content.trim()) return;
+
+      setSharedContent(content);
+      setIsSharing(true);
+
+      // Navigate to share screen
+      setCurrentScreen("share");
+    } catch (error) {
+      console.error("Error processing share:", error);
+      Alert.alert("Error", "Failed to process shared content");
+    }
+  }, []);
+
+  const clearSharedContent = useCallback(() => {
+    setSharedContent("");
+    setIsSharing(false);
+    setCurrentScreen("notes-list");
+  }, []);
 
   // Function to flush all pending saves
   const flushPendingSaves = useCallback(async (): Promise<void> => {
@@ -518,6 +540,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     isSharing,
     setIsSharing,
     processIncomingShare,
+    clearSharedContent,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

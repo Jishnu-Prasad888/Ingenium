@@ -1,44 +1,14 @@
-// App.tsx - Clean version
+// App.tsx
 import React, { useEffect, useState } from "react";
 import { View, ActivityIndicator, Text } from "react-native";
 import { AppProvider } from "./src/context/AppContext";
-import { useFonts } from "expo-font";
-import NotesListScreen from "./src/screens/NotesListScreen";
-import FolderExplorerScreen from "./src/screens/FolderExplorerScreen";
-import NoteEditorScreen from "./src/screens/NoteEditorScreen";
-import BottomNavigationBar from "./src/components/BottomNavigationBar";
-import SyncIndicator from "./src/components/SyncIndicator";
 import { colors } from "./src/theme/colors";
 import StorageService from "./src/services/StorageService";
-import DebugDatabaseInfo from "./src/components/DebugDatabaseInfo";
+import { AppContent } from "./src/components/AppContent";
 
-// Create a wrapper component that provides the AppContent
+// Wrapper that lazy-loads AppContent
+// Wrapper that lazy-loads AppContent
 const AppWrapper: React.FC = () => {
-  // We'll import AppContent from a separate file to avoid circular dependencies
-  const [AppContent, setAppContent] = useState<React.FC | null>(null);
-
-  useEffect(() => {
-    // Dynamically import AppContent to avoid circular dependencies
-    import("./src/components/AppContent").then((module) => {
-      setAppContent(() => module.default);
-    });
-  }, []);
-
-  if (!AppContent) {
-    return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: "center",
-          alignItems: "center",
-          backgroundColor: colors.background,
-        }}
-      >
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
-
   return <AppContent />;
 };
 
@@ -53,10 +23,7 @@ const IngeniumApp: React.FC = () => {
     const initializeApp = async () => {
       try {
         console.log("Initializing SQLite database...");
-
-        // Initialize the database
         await StorageService.initialize();
-
         console.log("SQLite database initialized successfully");
         setDatabaseInitialized(true);
       } catch (error) {
@@ -64,17 +31,14 @@ const IngeniumApp: React.FC = () => {
         setInitializationError(
           "Failed to initialize database. Please restart the app."
         );
-
-        // Still continue with app
+        // Allow app to continue even if DB fails
         setDatabaseInitialized(true);
       }
     };
 
     initializeApp();
 
-    // Cleanup function
     return () => {
-      // Ensure data is saved before component unmounts
       const cleanup = async () => {
         try {
           await StorageService.ensureDataSaved();
@@ -82,12 +46,10 @@ const IngeniumApp: React.FC = () => {
           console.error("Error during cleanup:", error);
         }
       };
-
       cleanup();
     };
   }, []);
 
-  // Show loading screen while database initializes
   if (!databaseInitialized) {
     return (
       <View

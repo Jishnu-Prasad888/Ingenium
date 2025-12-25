@@ -28,7 +28,6 @@ import SearchBar from "../components/SearchBar";
 import SortControl from "../components/SortControl";
 import NoteCard from "../components/NoteCard";
 import FolderCard from "../components/FolderCard";
-import Divider from "../components/Divider";
 import { colors } from "../theme/colors";
 
 interface ShareScreenProps {
