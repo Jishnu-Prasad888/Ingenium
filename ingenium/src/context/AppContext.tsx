@@ -38,6 +38,10 @@ interface AppContextType {
   performInitialSync: () => Promise<void>;
   deleteNote: (id: string) => Promise<boolean>;
   deleteFolder: (id: string) => Promise<boolean>;
+  sharedContent: string;
+  setSharedContent: (content: string) => void;
+  isSharing: boolean;
+  setIsSharing: (sharing: boolean) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -53,6 +57,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("date-desc");
   const [isSyncing, setIsSyncing] = useState(false);
+
+  const [sharedContent, setSharedContent] = useState("");
+  const [isSharing, setIsSharing] = useState(false);
 
   // Refs for debouncing
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -502,7 +509,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     loadData,
     performInitialSync,
     deleteNote,
-    deleteFolder, // Add this to the value object
+    deleteFolder,
+    sharedContent,
+    setSharedContent,
+    isSharing,
+    setIsSharing,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
