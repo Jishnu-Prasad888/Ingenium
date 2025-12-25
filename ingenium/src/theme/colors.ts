@@ -14,6 +14,7 @@ export const colors = {
     error : 'rgba(255,0,0,255)',
     warning: "#FFA500", // Add this line for warning/orange color
     success: "#4CAF50", // Optional: add success color too
+    lightgreen: "#dcffdd48", // Optional: add success color too
     info: "#2196F3", // Optional: add info color
 
 };

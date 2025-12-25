@@ -7,7 +7,7 @@ import {
   Animated,
   Pressable,
 } from "react-native";
-import { Folder, ChevronRight, X } from "lucide-react-native";
+import { Folder, ChevronRight, Trash2 } from "lucide-react-native";
 import { colors } from "../theme/colors";
 import { useApp } from "../context/AppContext";
 import DeleteConfirmationPopup from "./DeleteConfirmationPopup";
@@ -104,7 +104,7 @@ const FolderCard: React.FC<FolderCardProps> = ({ folder }) => {
           alignItems: "center",
           backgroundColor: colors.backgroundCard,
           borderRadius: 14,
-          padding: 16,
+          padding: 12,
           marginBottom: 12,
           shadowColor: colors.shadow,
           shadowOffset: { width: 0, height: 2 },
@@ -166,7 +166,7 @@ const FolderCard: React.FC<FolderCardProps> = ({ folder }) => {
             marginBottom: 2,
             paddingTop: 16,
             marginTop: 20,
-            paddingRight: -1,
+            paddingRight: 4,
           }}
         >
           <ChevronRight size={20} color={colors.textSecondary} />
@@ -196,7 +196,7 @@ const FolderCard: React.FC<FolderCardProps> = ({ folder }) => {
               transform: [{ scale: deleteScale }, { rotate: rotation }],
             }}
           >
-            <X size={16} color={colors.textSecondary} />
+            <Trash2 size={16} color={colors.textSecondary} />
           </Animated.View>
         </Pressable>
       </TouchableOpacity>

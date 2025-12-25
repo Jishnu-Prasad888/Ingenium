@@ -15,7 +15,6 @@ import SearchBar from "../components/SearchBar";
 import SortControl from "../components/SortControl";
 import NoteCard from "../components/NoteCard";
 import FolderCard from "../components/FolderCard";
-import Divider from "../components/Divider";
 import { colors } from "../theme/colors";
 
 const FolderExplorerScreen: React.FC = () => {
@@ -106,7 +105,6 @@ const FolderExplorerScreen: React.FC = () => {
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Header />
       <SearchBar />
-
       <View
         style={{
           flexDirection: "row",
@@ -146,66 +144,90 @@ const FolderExplorerScreen: React.FC = () => {
           <SortControl />
         </View>
       </View>
-
-      <View style={{ paddingHorizontal: 20, marginBottom: 12, marginTop: -10 }}>
+      <View style={{ paddingHorizontal: 20, marginBottom: 12, marginTop: -14 }}>
         <Text
-          style={{ fontSize: 16, color: colors.primary, fontFamily: "serif" }}
+          style={{ fontSize: 14, color: colors.primary, fontFamily: "serif" }}
         >
           Folder : {getCurrentPath()}
         </Text>
       </View>
-
       <ScrollView
         style={{
+          backgroundColor: colors.lightgreen,
           flex: 1,
           paddingHorizontal: 20,
           marginBottom: 2,
           borderRadius: 10,
         }}
       >
-        {/* Notes Section (only if notes exist) */}
-        {currentFolderNotes.length > 0 && (
-          <>
-            <SectionHeader
-              title="Notes"
-              count={currentFolderNotes.length}
-              expanded={showNotes}
-              onPress={() => setShowNotes((prev) => !prev)}
-            />
-
-            {showNotes &&
-              currentFolderNotes.map((note) => (
-                <NoteCard key={note.id} note={note} />
-              ))}
-          </>
-        )}
-
-        {/* Divider only if both sections exist */}
-        {currentFolderNotes.length > 0 && subfolders.length > 0 && (
+        {/* Show "nothing to show here" if no folders and no notes */}
+        {currentFolderNotes.length === 0 && subfolders.length === 0 ? (
           <View
             style={{
-              height: 1,
-              backgroundColor: colors.text,
-              marginVertical: 16,
-              opacity: 0.3,
+              flex: 1,
+              justifyContent: "center",
+              alignItems: "center",
+              marginTop: 100,
             }}
-          />
-        )}
-
-        {/* Folders Section (only if folders exist) */}
-        {subfolders.length > 0 && (
+          >
+            <Text
+              style={{
+                fontSize: 16,
+                color: colors.text,
+                opacity: 0.7,
+                fontStyle: "italic",
+              }}
+            >
+              This Folder is empty
+            </Text>
+          </View>
+        ) : (
           <>
-            <SectionHeader
-              title="Folders"
-              count={subfolders.length}
-              expanded={showFolders}
-              onPress={() => setShowFolders((prev) => !prev)}
-            />
+            {/* Notes Section (only if notes exist) */}
+            {currentFolderNotes.length > 0 && (
+              <>
+                <SectionHeader
+                  title="Notes"
+                  count={currentFolderNotes.length}
+                  expanded={showNotes}
+                  onPress={() => setShowNotes((prev) => !prev)}
+                />
 
-            {showFolders &&
-              subfolders.map((folder) => (
-                <FolderCard key={folder.id} folder={folder} />
-              ))}
+                {showNotes &&
+                  currentFolderNotes.map((note) => (
+                    <NoteCard key={note.id} note={note} />
+                  ))}
+              </>
+            )}
+
+            {/* Divider only if both sections exist */}
+            {currentFolderNotes.length > 0 && subfolders.length > 0 && (
+              <View
+                style={{
+                  height: 1,
+                  backgroundColor: colors.text,
+                  marginVertical: 16,
+                  opacity: 0.3,
+                }}
+              />
+            )}
+
+            {/* Folders Section (only if folders exist) */}
+            {subfolders.length > 0 && (
+              <>
+                <SectionHeader
+                  title="Folders"
+                  count={subfolders.length}
+                  expanded={showFolders}
+                  onPress={() => setShowFolders((prev) => !prev)}
+                />
+
+                {showFolders &&
+                  subfolders.map((folder) => (
+                    <FolderCard key={folder.id} folder={folder} />
+                  ))}
+              </>
+            )}
           </>
         )}
 
@@ -215,7 +237,7 @@ const FolderExplorerScreen: React.FC = () => {
       <View
         style={{
           paddingHorizontal: 20,
-          paddingBottom: 112,
+          paddingBottom: 90,
           flexDirection: "row",
           alignItems: "center",
           alignContent: "center",

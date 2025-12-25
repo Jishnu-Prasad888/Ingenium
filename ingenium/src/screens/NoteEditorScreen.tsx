@@ -273,7 +273,7 @@ const NoteEditorScreen: React.FC = () => {
                 color: colors.text,
                 textAlignVertical: "top",
                 minHeight: 250,
-                marginBottom: 120,
+                marginBottom: 98,
               }}
               value={content}
               onChangeText={handleContentChange}
@@ -288,7 +288,7 @@ const NoteEditorScreen: React.FC = () => {
       <View
         style={{
           paddingHorizontal: 20,
-          paddingBottom: 112,
+          paddingBottom: 92,
           flexDirection: "row",
           alignItems: "center",
           alignContent: "center",
