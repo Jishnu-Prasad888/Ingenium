@@ -7,15 +7,18 @@ import {
   TouchableOpacity,
   Text,
   Share,
+  useWindowDimensions,
 } from "react-native";
 import { ChevronLeft, Share2, Save, Trash2 } from "lucide-react-native";
 import { useApp } from "../context/AppContext";
 import Header from "../components/Header";
-import DeleteConfirmationPopup from "../components/DeleteConfirmationPopup"; // Import the popup
+import DeleteConfirmationPopup from "../components/DeleteConfirmationPopup";
 import { colors } from "../theme/colors";
 import { formatDate } from "../utils/helpers";
 
 const NoteEditorScreen: React.FC = () => {
+  const { width } = useWindowDimensions();
+  const showButtonText = width >= 420;
   const {
     notes,
     folders,
@@ -23,7 +26,7 @@ const NoteEditorScreen: React.FC = () => {
     setCurrentScreen,
     debouncedUpdateNote,
     flushPendingSaves,
-    deleteNote, // Get deleteNote from context
+    deleteNote,
   } = useApp();
 
   const note = notes.find((n) => n.id === currentNoteId);
@@ -314,16 +317,20 @@ const NoteEditorScreen: React.FC = () => {
           onPress={handleBack}
         >
           <ChevronLeft size={20} color={colors.text} />
-          <Text
-            style={{
-              fontSize: 16,
-              color: colors.text,
-              paddingLeft: 10,
-              textAlign: "center",
-            }}
-          >
-            Back
-          </Text>
+          {showButtonText && (
+            <Text
+              numberOfLines={1}
+              ellipsizeMode="tail"
+              style={{
+                fontSize: 16,
+                color: colors.text,
+                paddingLeft: 10,
+                textAlign: "center",
+              }}
+            >
+              Back
+            </Text>
+          )}
         </TouchableOpacity>
 
         <View
@@ -372,7 +379,7 @@ const NoteEditorScreen: React.FC = () => {
             flex: 1,
             backgroundColor: colors.backgroundCard,
             borderRadius: 12,
-            paddingLeft: 10,
+            paddingLeft: 14,
             paddingRight: 20,
             height: 45,
             alignItems: "center",
@@ -387,9 +394,17 @@ const NoteEditorScreen: React.FC = () => {
           onPress={handleSaveNow}
         >
           <Save size={18} color={colors.text} />
-          <Text style={{ marginLeft: 8, fontSize: 16, color: colors.text }}>
-            Save
-          </Text>
+          {showButtonText && (
+            <Text
+              style={{
+                marginLeft: 8,
+                fontSize: 16,
+                color: colors.text,
+              }}
+            >
+              Save
+            </Text>
+          )}
         </TouchableOpacity>
 
         <View
@@ -423,9 +438,11 @@ const NoteEditorScreen: React.FC = () => {
           onPress={handleShare}
         >
           <Share2 size={18} color={colors.text} />
-          <Text style={{ marginLeft: 8, fontSize: 16, color: colors.text }}>
-            Share
-          </Text>
+          {showButtonText && (
+            <Text style={{ marginLeft: 8, fontSize: 16, color: colors.text }}>
+              Share
+            </Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>

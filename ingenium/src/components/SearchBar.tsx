@@ -17,7 +17,7 @@ const SearchBar: React.FC = () => {
             backgroundColor: colors.backgroundCard,
             borderRadius: 12,
             paddingHorizontal: 16,
-            paddingVertical: 3,
+            paddingVertical: 1,
           }}
         >
           <TextInput

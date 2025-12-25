@@ -36,8 +36,8 @@ const NotesListScreen: React.FC = () => {
           style={{
             backgroundColor: colors.backgroundCard,
             borderRadius: 12,
-            padding: 16,
-            height: 54,
+            padding: 10,
+            height: 40,
             alignItems: "center",
             flexDirection: "row",
             justifyContent: "center",
@@ -46,13 +46,20 @@ const NotesListScreen: React.FC = () => {
             shadowOpacity: 0.1,
             shadowRadius: 4,
             elevation: 0,
+            paddingBottom: 11,
           }}
           onPress={() => createNote(null)}
         >
           <Text style={{ fontSize: 18, color: colors.text, marginRight: 8 }}>
             Create a new note
           </Text>
-          <Plus size={20} color={colors.text} />
+          <View
+            style={{
+              marginBottom: -5,
+            }}
+          >
+            <Plus size={20} color={colors.text} />
+          </View>
         </TouchableOpacity>
       </View>
 
