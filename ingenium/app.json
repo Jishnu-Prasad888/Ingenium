@@ -5,30 +5,32 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "ingenium",
-    "platforms": ["ios", "android"],
+    "platforms": [
+      "ios",
+      "android"
+    ],
     "icon": "./assets/images/logo.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-
     "splash": {
       "image": "./assets/images/logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#F5E6D8"
     },
-
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.yourcompany.ingenium",
       "infoPlist": {
         "CFBundleURLTypes": [
           {
-            "CFBundleURLSchemes": ["ingenium"],
+            "CFBundleURLSchemes": [
+              "ingenium"
+            ],
             "CFBundleURLName": "Ingenium Notes"
           }
         ]
       }
     },
-
     "android": {
       "package": "com.yourcompany.ingenium",
       "adaptiveIcon": {
@@ -44,7 +46,10 @@
               "scheme": "ingenium"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         },
         {
           "action": "SEND",
@@ -53,25 +58,28 @@
               "mimeType": "text/plain"
             }
           ],
-          "category": ["DEFAULT"]
+          "category": [
+            "DEFAULT"
+          ]
         }
       ]
     },
-
     "web": {
       "bundler": "metro",
       "output": "static",
       "favicon": "./assets/images/logo.png"
     },
-
     "plugins": [
       [
         "expo-font",
         {
-          "fonts": ["./assets/fonts/logo.ttf"]
+          "fonts": [
+            "./assets/fonts/logo.ttf"
+          ]
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-share-intent"
     ]
   }
 }
