@@ -42,6 +42,7 @@ interface AppContextType {
   setSharedContent: (content: string) => void;
   isSharing: boolean;
   setIsSharing: (sharing: boolean) => void;
+  processIncomingShare?: (url: string) => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -114,6 +115,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       flushPendingSaves();
     };
   }, []);
+
+  const processIncomingShare = useCallback((url: string) => {}, []);
 
   // Function to flush all pending saves
   const flushPendingSaves = useCallback(async (): Promise<void> => {
@@ -514,6 +517,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     setSharedContent,
     isSharing,
     setIsSharing,
+    processIncomingShare,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
