@@ -20,45 +20,6 @@ import { colors } from "../theme/colors";
 import { formatDate } from "../utils/helpers";
 import Markdown from "react-native-markdown-display";
 
-const InlineMarkdownRenderer = ({ content }: { content: string }) => {
-  return (
-    <View>
-      {content.split("\n").map((line, index) => {
-        let style: TextStyle = {
-          fontSize: 16,
-          color: colors.text,
-          lineHeight: 22,
-          includeFontPadding: false,
-        };
-
-        let text = line || "\n";
-
-        if (line.startsWith("### ")) {
-          style = { ...style, fontSize: 20, fontWeight: "600" };
-          text = line.replace("### ", "");
-        } else if (line.startsWith("## ")) {
-          style = { ...style, fontSize: 24, fontWeight: "700" };
-          text = line.replace("## ", "");
-        } else if (line.startsWith("# ")) {
-          style = {
-            ...style,
-            fontSize: 28,
-            fontWeight: "800",
-            color: colors.primary,
-          };
-          text = line.replace("# ", "");
-        }
-
-        return (
-          <Text key={index} style={style}>
-            {text}
-          </Text>
-        );
-      })}
-    </View>
-  );
-};
-
 const NoteEditorScreen: React.FC = () => {
   const { width } = useWindowDimensions();
   const showButtonText = width >= 420;
@@ -390,13 +351,22 @@ const NoteEditorScreen: React.FC = () => {
                   >
                     <Markdown
                       style={{
-                        body: { color: colors.text, fontSize: 16 },
-                        heading1: { fontSize: 28, color: colors.primary },
-                        heading2: { fontSize: 24 },
-                        heading3: { fontSize: 20 },
+                        body: {
+                          color: colors.text,
+                          fontSize: 16,
+                          lineHeight: 22,
+                        },
+                        heading1: {
+                          fontSize: 28,
+                          color: colors.primary,
+                          fontWeight: "800",
+                        },
+                        heading2: { fontSize: 24, fontWeight: "700" },
+                        heading3: { fontSize: 20, fontWeight: "600" },
                         strong: { fontWeight: "700" },
                         em: { fontStyle: "italic" },
                         bullet_list: { marginVertical: 8 },
+                        paragraph: { marginVertical: 8 },
                       }}
                       rules={{
                         checkbox: (node, children) => {
@@ -411,6 +381,10 @@ const NoteEditorScreen: React.FC = () => {
                                   checked ? "- [ ]" : "- [x]"
                                 );
                                 setContent(updated);
+                                setHasUnsavedChanges(true);
+                                debouncedUpdateNote(note.id, {
+                                  content: updated,
+                                });
                               }}
                               style={{
                                 flexDirection: "row",
@@ -436,50 +410,27 @@ const NoteEditorScreen: React.FC = () => {
                       paddingBottom: 120,
                     }}
                   >
-                    <View style={{ position: "relative", minHeight: 350 }}>
-                      {/* Markdown render layer */}
-                      <View
-                        pointerEvents="none"
-                        style={{
-                          position: "absolute",
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          padding: 16,
-                        }}
-                      >
-                        <InlineMarkdownRenderer content={content} />
-                      </View>
-
-                      {/* Text input layer */}
-                      <TextInput
-                        ref={contentInputRef}
-                        value={content}
-                        onChangeText={handleContentChange}
-                        onSelectionChange={(e) =>
-                          setSelection(e.nativeEvent.selection)
-                        }
-                        multiline
-                        scrollEnabled={false}
-                        caretColor={colors.text}
-                        style={{
-                          position: "absolute",
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          padding: 16,
-                          fontSize: 16,
-                          color: "transparent", // keeps your text invisible
-                          fontFamily:
-                            Platform.OS === "ios" ? "Menlo" : "monospace",
-                          lineHeight: 22,
-                          includeFontPadding: false,
-                          textAlignVertical: "top",
-                        }}
-                      />
-                    </View>
+                    <TextInput
+                      ref={contentInputRef}
+                      value={content}
+                      onChangeText={handleContentChange}
+                      onSelectionChange={(e) =>
+                        setSelection(e.nativeEvent.selection)
+                      }
+                      multiline
+                      scrollEnabled={false}
+                      caretColor={colors.text}
+                      style={{
+                        fontSize: 16,
+                        color: colors.text,
+                        fontFamily:
+                          Platform.OS === "ios" ? "Menlo" : "monospace",
+                        lineHeight: 22,
+                        includeFontPadding: false,
+                        textAlignVertical: "top",
+                        minHeight: 350,
+                      }}
+                    />
                   </ScrollView>
                 )}
               </View>
