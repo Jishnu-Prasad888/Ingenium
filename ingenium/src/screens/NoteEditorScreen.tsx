@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   TextStyle,
+  Pressable,
 } from "react-native";
 import { ChevronLeft, Share2, Save, Trash2 } from "lucide-react-native";
 import { useApp } from "../context/AppContext";
@@ -28,7 +29,6 @@ interface MarkdownRendererProps {
 }
 
 // Custom Markdown Renderer with Checkbox Support
-// Custom Markdown Renderer with Checkbox Support
 const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   content,
   note,
@@ -36,28 +36,9 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
 }) => {
   const { debouncedUpdateNote } = useApp();
 
-  const handleCheckboxToggle = (lineIndex: number, lineText: string) => {
+  // Use useMemo to memoize the rendered content
+  const renderedContent = React.useMemo(() => {
     const lines = content.split("\n");
-
-    // Toggle the checkbox
-    let newLineText = lineText;
-    if (lineText.includes("[ ]")) {
-      newLineText = lineText.replace("[ ]", "[x]");
-    } else if (lineText.includes("[x]")) {
-      newLineText = lineText.replace("[x]", "[ ]");
-    }
-
-    // Update the line in the array
-    lines[lineIndex] = newLineText;
-    const updatedContent = lines.join("\n");
-
-    // Update parent and save
-    onContentChange(updatedContent);
-    debouncedUpdateNote(note.id, { content: updatedContent });
-  };
-
-  const renderContent = () => {
-    const lines = content.split("\n"); // Use the prop content, not local state
     let inCodeBlock = false;
     let codeBlockContent = "";
     const renderedElements: React.ReactNode[] = [];
@@ -69,11 +50,9 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
       // Handle code blocks
       if (line.trim().startsWith("```")) {
         if (!inCodeBlock) {
-          // Start of code block
           inCodeBlock = true;
           codeBlockContent = "";
         } else {
-          // End of code block
           inCodeBlock = false;
           renderedElements.push(
             <View
@@ -107,22 +86,44 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
         continue;
       }
 
-      // Check for checkbox lines (must start with - [ ] or - [x])
+      // Check for checkbox lines
       const trimmedLine = line.trim();
-      if (trimmedLine.startsWith("- [ ]") || trimmedLine.startsWith("- [x]")) {
+      const checkboxLineIndex = lineIndex;
+      if (/^-\s*\[( |x|X)\]/.test(trimmedLine)) {
         const isChecked = trimmedLine.includes("[x]");
         const taskText = trimmedLine.replace(/^-\s*\[[ x]\]\s*/, "");
 
         renderedElements.push(
-          <TouchableOpacity
+          <Pressable
             key={`checkbox-${lineIndex}`}
-            onPress={() => handleCheckboxToggle(lineIndex, line)}
-            style={{
+            onPress={() => {
+              const linesCopy = content.split("\n");
+              const originalLine = linesCopy[checkboxLineIndex];
+
+              if (/^-\s*\[ \]/.test(originalLine)) {
+                linesCopy[checkboxLineIndex] = originalLine.replace(
+                  /^-\s*\[ \]/,
+                  "- [x]"
+                );
+              } else if (/^-\s*\[[xX]\]/.test(originalLine)) {
+                linesCopy[checkboxLineIndex] = originalLine.replace(
+                  /^-\s*\[[xX]\]/,
+                  "- [ ]"
+                );
+              }
+
+              const updatedContent = linesCopy.join("\n");
+
+              onContentChange(updatedContent);
+              debouncedUpdateNote(note.id, { content: updatedContent });
+            }}
+            style={({ pressed }) => ({
               flexDirection: "row",
               alignItems: "flex-start",
               marginVertical: 4,
               paddingVertical: 2,
-            }}
+              opacity: pressed ? 0.6 : 1,
+            })}
           >
             <Text
               style={{
@@ -144,18 +145,17 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             >
               {taskText}
             </Text>
-          </TouchableOpacity>
+          </Pressable>
         );
         lineIndex++;
         continue;
       }
 
-      // For regular content, collect consecutive lines for better Markdown parsing
+      // For regular content
       let markdownContent = "";
       while (lineIndex < lines.length) {
         const currentLine = lines[lineIndex];
 
-        // Stop collecting if we hit a checkbox or code block
         if (
           currentLine.trim().startsWith("```") ||
           currentLine.trim().startsWith("- [ ]") ||
@@ -243,9 +243,9 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
     }
 
     return renderedElements;
-  };
+  }, [content, note.id, debouncedUpdateNote, onContentChange]); // Re-run when content changes
 
-  return <View>{renderContent()}</View>;
+  return <View>{renderedContent}</View>;
 };
 
 const NoteEditorScreen: React.FC = () => {
@@ -572,6 +572,7 @@ const NoteEditorScreen: React.FC = () => {
                 {isPreview ? (
                   <ScrollView
                     showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="always"
                     contentContainerStyle={{
                       padding: 16,
                       paddingBottom: 120,
@@ -581,6 +582,7 @@ const NoteEditorScreen: React.FC = () => {
                       <MarkdownRenderer
                         content={content}
                         note={note}
+                        key={`markdown-${content}-${Date.now()}`} // Force re-render on content change
                         onContentChange={(newContent) => {
                           setContent(newContent);
                           setHasUnsavedChanges(true);
