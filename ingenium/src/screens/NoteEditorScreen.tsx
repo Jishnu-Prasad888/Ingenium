@@ -8,6 +8,10 @@ import {
   Text,
   Share,
   useWindowDimensions,
+  KeyboardAvoidingView,
+  Platform,
+  TextStyle,
+  Pressable,
 } from "react-native";
 import { ChevronLeft, Share2, Save, Trash2 } from "lucide-react-native";
 import { useApp } from "../context/AppContext";
@@ -15,6 +19,234 @@ import Header from "../components/Header";
 import DeleteConfirmationPopup from "../components/DeleteConfirmationPopup";
 import { colors } from "../theme/colors";
 import { formatDate } from "../utils/helpers";
+import Markdown from "react-native-markdown-display";
+
+// Define props interface for MarkdownRenderer
+interface MarkdownRendererProps {
+  content: string;
+  note: any;
+  onContentChange: (content: string) => void;
+}
+
+// Custom Markdown Renderer with Checkbox Support
+const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
+  content,
+  note,
+  onContentChange,
+}) => {
+  const { debouncedUpdateNote } = useApp();
+
+  // Use useMemo to memoize the rendered content
+  const renderedContent = React.useMemo(() => {
+    const lines = content.split("\n");
+    let inCodeBlock = false;
+    let codeBlockContent = "";
+    const renderedElements: React.ReactNode[] = [];
+    let lineIndex = 0;
+
+    while (lineIndex < lines.length) {
+      const line = lines[lineIndex];
+
+      // Handle code blocks
+      if (line.trim().startsWith("```")) {
+        if (!inCodeBlock) {
+          inCodeBlock = true;
+          codeBlockContent = "";
+        } else {
+          inCodeBlock = false;
+          renderedElements.push(
+            <View
+              key={`code-${lineIndex}`}
+              style={{
+                backgroundColor: colors.backgroundCard,
+                padding: 12,
+                borderRadius: 8,
+                marginVertical: 8,
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+                  fontSize: 14,
+                  color: colors.text,
+                }}
+              >
+                {codeBlockContent}
+              </Text>
+            </View>
+          );
+        }
+        lineIndex++;
+        continue;
+      }
+
+      if (inCodeBlock) {
+        codeBlockContent += line + "\n";
+        lineIndex++;
+        continue;
+      }
+
+      // Check for checkbox lines
+      const trimmedLine = line.trim();
+      const checkboxLineIndex = lineIndex;
+      if (/^-\s*\[( |x|X)\]/.test(trimmedLine)) {
+        const isChecked = trimmedLine.includes("[x]");
+        const taskText = trimmedLine.replace(/^-\s*\[[ x]\]\s*/, "");
+
+        renderedElements.push(
+          <Pressable
+            key={`checkbox-${lineIndex}`}
+            onPress={() => {
+              const linesCopy = content.split("\n");
+              const originalLine = linesCopy[checkboxLineIndex];
+
+              if (/^-\s*\[ \]/.test(originalLine)) {
+                linesCopy[checkboxLineIndex] = originalLine.replace(
+                  /^-\s*\[ \]/,
+                  "- [x]"
+                );
+              } else if (/^-\s*\[[xX]\]/.test(originalLine)) {
+                linesCopy[checkboxLineIndex] = originalLine.replace(
+                  /^-\s*\[[xX]\]/,
+                  "- [ ]"
+                );
+              }
+
+              const updatedContent = linesCopy.join("\n");
+
+              onContentChange(updatedContent);
+              debouncedUpdateNote(note.id, { content: updatedContent });
+            }}
+            style={({ pressed }) => ({
+              flexDirection: "row",
+              alignItems: "flex-start",
+              marginVertical: 4,
+              paddingVertical: 2,
+              opacity: pressed ? 0.6 : 1,
+            })}
+          >
+            <Text
+              style={{
+                fontSize: 18,
+                marginRight: 12,
+                color: isChecked ? colors.primary : colors.text,
+              }}
+            >
+              {isChecked ? "☑" : "☐"}
+            </Text>
+            <Text
+              style={{
+                fontSize: 16,
+                lineHeight: 24,
+                flex: 1,
+                color: isChecked ? colors.textSecondary : colors.text,
+                textDecorationLine: isChecked ? "line-through" : "none",
+              }}
+            >
+              {taskText}
+            </Text>
+          </Pressable>
+        );
+        lineIndex++;
+        continue;
+      }
+
+      // For regular content
+      let markdownContent = "";
+      while (lineIndex < lines.length) {
+        const currentLine = lines[lineIndex];
+
+        if (
+          currentLine.trim().startsWith("```") ||
+          currentLine.trim().startsWith("- [ ]") ||
+          currentLine.trim().startsWith("- [x]")
+        ) {
+          break;
+        }
+
+        markdownContent += currentLine + "\n";
+        lineIndex++;
+      }
+
+      if (markdownContent.trim()) {
+        renderedElements.push(
+          <Markdown
+            key={`md-${lineIndex}`}
+            style={{
+              body: {
+                color: colors.text,
+                fontSize: 16,
+                lineHeight: 24,
+              },
+              heading1: {
+                fontSize: 28,
+                color: colors.primary,
+                fontWeight: "800" as const,
+                marginTop: renderedElements.length === 0 ? 0 : 24,
+                marginBottom: 12,
+              },
+              heading2: {
+                fontSize: 24,
+                fontWeight: "700" as const,
+                marginTop: 20,
+                marginBottom: 10,
+              },
+              heading3: {
+                fontSize: 20,
+                fontWeight: "600" as const,
+                marginTop: 16,
+                marginBottom: 8,
+              },
+              paragraph: {
+                marginVertical: 8,
+                lineHeight: 24,
+              },
+              strong: { fontWeight: "700" as const },
+              em: { fontStyle: "italic" as const },
+              bullet_list: {
+                marginVertical: 8,
+                marginLeft: 20,
+              },
+              ordered_list: {
+                marginVertical: 8,
+                marginLeft: 20,
+              },
+              list_item: {
+                marginVertical: 4,
+              },
+              code_inline: {
+                backgroundColor: colors.backgroundCard,
+                paddingHorizontal: 4,
+                paddingVertical: 2,
+                borderRadius: 4,
+                fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+              },
+              blockquote: {
+                backgroundColor: colors.backgroundCard,
+                borderLeftWidth: 4,
+                borderLeftColor: colors.primary,
+                paddingLeft: 12,
+                paddingVertical: 8,
+                marginVertical: 8,
+              },
+              hr: {
+                backgroundColor: colors.border,
+                height: 1,
+                marginVertical: 16,
+              },
+            }}
+          >
+            {markdownContent}
+          </Markdown>
+        );
+      }
+    }
+
+    return renderedElements;
+  }, [content, note.id, debouncedUpdateNote, onContentChange]); // Re-run when content changes
+
+  return <View>{renderedContent}</View>;
+};
 
 const NoteEditorScreen: React.FC = () => {
   const { width } = useWindowDimensions();
@@ -32,11 +264,69 @@ const NoteEditorScreen: React.FC = () => {
   const note = notes.find((n) => n.id === currentNoteId);
 
   // Local state
+  const [isPreview, setIsPreview] = useState(false);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [showDeletePopup, setShowDeletePopup] = useState(false);
   const lastSavedRef = useRef<number>(Date.now());
+  const contentInputRef = useRef<TextInput>(null);
+  const [selection, setSelection] = useState({ start: 0, end: 0 });
+
+  const FormatButton = ({
+    label,
+    onPress,
+  }: {
+    label: string;
+    onPress: () => void;
+  }) => (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.7}
+      style={{
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        borderRadius: 10,
+        backgroundColor: colors.backgroundCard,
+        borderWidth: 1,
+        borderColor: colors.textSecondary,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Text
+        style={{
+          color: colors.text,
+          fontWeight: "600",
+          lineHeight: 16,
+        }}
+      >
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+
+  const insertMarkdown = (prefix: string, suffix = "") => {
+    if (!note) return;
+
+    const start = selection.start;
+    const end = selection.end;
+
+    const before = content.slice(0, start);
+    const selected = content.slice(start, end);
+    const after = content.slice(end);
+
+    const newText = before + prefix + selected + suffix + after;
+    const cursorPosition = start + prefix.length + selected.length;
+
+    setContent(newText);
+    setHasUnsavedChanges(true);
+    debouncedUpdateNote(note.id, { content: newText });
+
+    requestAnimationFrame(() => {
+      contentInputRef.current?.setSelection(cursorPosition, cursorPosition);
+    });
+  };
 
   // Initialize local state when note loads
   useEffect(() => {
@@ -205,95 +495,204 @@ const NoteEditorScreen: React.FC = () => {
         </View>
       )}
 
-      <View style={{ flex: 1, paddingHorizontal: 20, marginBottom: 10 }}>
-        <View
-          style={{
-            flex: 1,
-            backgroundColor: colors.backgroundCard,
-            borderRadius: 12,
-            padding: 20,
-          }}
-        >
-          {/* Title */}
-          <TextInput
-            style={{
-              fontSize: 32,
-              fontFamily: "serif",
-              color: colors.primary,
-              marginBottom: 8,
-              borderBottomWidth: 2,
-              borderBottomColor: colors.text,
-              paddingBottom: 8,
-            }}
-            value={title}
-            onChangeText={handleTitleChange}
-            placeholder="Title"
-            placeholderTextColor={colors.textSecondary}
-          />
-
-          {/* Meta info */}
+      {/* KeyboardAvoidingView wraps the main content area */}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 0} // header height
+      >
+        <View style={{ flex: 1, paddingHorizontal: 20, marginBottom: 10 }}>
           <View
             style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 12,
+              flex: 1,
+              backgroundColor: colors.backgroundCard,
+              borderRadius: 12,
+              padding: 20,
             }}
           >
-            <View>
-              <Text style={{ fontSize: 12, color: colors.textSecondary }}>
-                Folder: {folderPath}
-              </Text>
-              <Text style={{ fontSize: 12, color: colors.textSecondary }}>
-                Created: {formatDate(note.createdAt)}
-              </Text>
-            </View>
-
-            <View style={{ alignItems: "flex-end" }}>
-              <Text style={{ fontSize: 10, color: colors.textSecondary }}>
-                Last save: {getLastSaveText()}
-              </Text>
-              {hasUnsavedChanges && (
-                <Text style={{ fontSize: 10, color: colors.warning }}>
-                  • Unsaved
-                </Text>
-              )}
-            </View>
-          </View>
-
-          {/* Scrollable content */}
-          <ScrollView
-            style={{ flex: 1 }}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-          >
+            {/* Title */}
             <TextInput
               style={{
-                fontSize: 16,
-                color: colors.text,
-                textAlignVertical: "top",
-                minHeight: 250,
-                marginBottom: 98,
+                fontSize: 32,
+                fontFamily: "serif",
+                color: colors.primary,
+                marginBottom: 8,
+                borderBottomWidth: 2,
+                borderBottomColor: colors.text,
+                paddingBottom: 8,
               }}
-              value={content}
-              onChangeText={handleContentChange}
-              multiline
-              placeholder="Start writing..."
+              value={title}
+              onChangeText={handleTitleChange}
+              placeholder="Title"
               placeholderTextColor={colors.textSecondary}
             />
-          </ScrollView>
-        </View>
-      </View>
 
+            {/* Meta info */}
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 12,
+              }}
+            >
+              <View>
+                <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                  Folder: {folderPath}
+                </Text>
+                <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                  Created: {formatDate(note.createdAt)}
+                </Text>
+              </View>
+
+              <View style={{ alignItems: "flex-end" }}>
+                <Text style={{ fontSize: 10, color: colors.textSecondary }}>
+                  Last save: {getLastSaveText()}
+                </Text>
+                {hasUnsavedChanges && (
+                  <Text style={{ fontSize: 10, color: colors.warning }}>
+                    • Unsaved
+                  </Text>
+                )}
+              </View>
+            </View>
+
+            {/* Editor container */}
+            <View style={{ flex: 1 }}>
+              <View
+                style={{
+                  flex: 1,
+                  backgroundColor: colors.backgroundAlt,
+                  borderRadius: 16,
+                  overflow: "hidden",
+                  marginTop: 8,
+                  marginBottom: 12, // space for toolbar
+                }}
+              >
+                {isPreview ? (
+                  <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="always"
+                    contentContainerStyle={{
+                      padding: 16,
+                      paddingBottom: 120,
+                    }}
+                  >
+                    {note && (
+                      <MarkdownRenderer
+                        content={content}
+                        note={note}
+                        key={`markdown-${content}-${Date.now()}`} // Force re-render on content change
+                        onContentChange={(newContent) => {
+                          setContent(newContent);
+                          setHasUnsavedChanges(true);
+                        }}
+                      />
+                    )}
+                  </ScrollView>
+                ) : (
+                  <ScrollView
+                    keyboardShouldPersistTaps="handled"
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={{
+                      padding: 16,
+                      paddingBottom: 120,
+                    }}
+                  >
+                    <TextInput
+                      ref={contentInputRef}
+                      value={content}
+                      onChangeText={handleContentChange}
+                      onSelectionChange={(e) =>
+                        setSelection(e.nativeEvent.selection)
+                      }
+                      multiline
+                      scrollEnabled={false}
+                      caretColor={colors.text}
+                      style={{
+                        fontSize: 16,
+                        color: colors.text,
+                        fontFamily:
+                          Platform.OS === "ios" ? "Menlo" : "monospace",
+                        lineHeight: 24,
+                        includeFontPadding: false,
+                        textAlignVertical: "top",
+                        minHeight: 350,
+                      }}
+                    />
+                  </ScrollView>
+                )}
+              </View>
+            </View>
+
+            {/* Keyboard-aware toolbar */}
+            <View
+              style={{
+                backgroundColor: colors.backgroundAlt,
+                borderTopWidth: 1,
+                borderTopColor: colors.textSecondary,
+                paddingVertical: 6,
+              }}
+            >
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 8,
+                  paddingHorizontal: 12,
+                }}
+              >
+                <FormatButton
+                  label={isPreview ? "Edit" : "Preview"}
+                  onPress={() => setIsPreview((p) => !p)}
+                />
+                <FormatButton label="H1" onPress={() => insertMarkdown("# ")} />
+                <FormatButton
+                  label="H2"
+                  onPress={() => insertMarkdown("## ")}
+                />
+                <FormatButton
+                  label="H3"
+                  onPress={() => insertMarkdown("### ")}
+                />
+                <FormatButton
+                  label="B"
+                  onPress={() => insertMarkdown("**", "**")}
+                />
+                <FormatButton
+                  label="I"
+                  onPress={() => insertMarkdown("*", "*")}
+                />
+                <FormatButton
+                  label="U"
+                  onPress={() => insertMarkdown("__", "__")}
+                />
+                <FormatButton
+                  label="☐"
+                  onPress={() => insertMarkdown("- [ ] ")}
+                />
+              </ScrollView>
+            </View>
+          </View>
+        </View>
+      </KeyboardAvoidingView>
+
+      {/* Bottom action buttons - outside KeyboardAvoidingView */}
       <View
         style={{
           paddingHorizontal: 20,
-          paddingBottom: 92,
+          paddingBottom: Platform.OS === "ios" ? 90 : 90,
+          paddingTop: 12,
           flexDirection: "row",
           alignItems: "center",
-          alignContent: "center",
           justifyContent: "center",
           gap: 8,
+          backgroundColor: colors.background,
+          borderTopWidth: 1,
+          borderTopColor: colors.border,
         }}
       >
         {/* Back Button */}
