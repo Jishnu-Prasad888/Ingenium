@@ -354,19 +354,74 @@ const NoteEditorScreen: React.FC = () => {
                         body: {
                           color: colors.text,
                           fontSize: 16,
-                          lineHeight: 22,
+                          lineHeight: 24,
                         },
                         heading1: {
                           fontSize: 28,
                           color: colors.primary,
                           fontWeight: "800",
+                          marginTop: 24,
+                          paddingBottom: 1,
+                          marginBottom: 2,
                         },
-                        heading2: { fontSize: 24, fontWeight: "700" },
-                        heading3: { fontSize: 20, fontWeight: "600" },
+                        heading2: {
+                          fontSize: 24,
+                          fontWeight: "700",
+                          marginTop: 20,
+                          marginBottom: 1,
+                        },
+                        heading3: {
+                          fontSize: 20,
+                          fontWeight: "600",
+                          marginTop: 16,
+                          marginBottom: 1,
+                        },
+                        paragraph: {
+                          marginVertical: 4,
+                          lineHeight: 24,
+                        },
                         strong: { fontWeight: "700" },
                         em: { fontStyle: "italic" },
-                        bullet_list: { marginVertical: 8 },
-                        paragraph: { marginVertical: 8 },
+                        bullet_list: {
+                          marginVertical: 8,
+                          marginLeft: 20,
+                        },
+                        ordered_list: {
+                          marginVertical: 8,
+                          marginLeft: 20,
+                        },
+                        list_item: {
+                          marginVertical: 4,
+                        },
+                        code_inline: {
+                          backgroundColor: colors.backgroundCard,
+                          paddingHorizontal: 4,
+                          paddingVertical: 2,
+                          borderRadius: 4,
+                          fontFamily:
+                            Platform.OS === "ios" ? "Menlo" : "monospace",
+                        },
+                        code_block: {
+                          backgroundColor: colors.backgroundCard,
+                          padding: 12,
+                          borderRadius: 8,
+                          marginVertical: 8,
+                          fontFamily:
+                            Platform.OS === "ios" ? "Menlo" : "monospace",
+                        },
+                        blockquote: {
+                          backgroundColor: colors.backgroundCard,
+                          borderLeftWidth: 4,
+                          borderLeftColor: colors.primary,
+                          paddingLeft: 12,
+                          paddingVertical: 8,
+                          marginVertical: 8,
+                        },
+                        hr: {
+                          backgroundColor: colors.border,
+                          height: 1,
+                          marginVertical: 16,
+                        },
                       }}
                       rules={{
                         checkbox: (node, children) => {
@@ -389,10 +444,15 @@ const NoteEditorScreen: React.FC = () => {
                               style={{
                                 flexDirection: "row",
                                 alignItems: "center",
+                                marginVertical: 4,
                               }}
                             >
-                              <Text>{checked ? "☑" : "☐"} </Text>
-                              <Text>{children}</Text>
+                              <Text style={{ fontSize: 16, marginRight: 8 }}>
+                                {checked ? "☑" : "☐"}
+                              </Text>
+                              <Text style={{ fontSize: 16, lineHeight: 24 }}>
+                                {children}
+                              </Text>
                             </TouchableOpacity>
                           );
                         },
