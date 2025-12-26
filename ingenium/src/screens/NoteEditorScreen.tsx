@@ -20,6 +20,234 @@ import { colors } from "../theme/colors";
 import { formatDate } from "../utils/helpers";
 import Markdown from "react-native-markdown-display";
 
+// Define props interface for MarkdownRenderer
+interface MarkdownRendererProps {
+  content: string;
+  note: any;
+  onContentChange: (content: string) => void;
+}
+
+// Custom Markdown Renderer with Checkbox Support
+// Custom Markdown Renderer with Checkbox Support
+const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
+  content,
+  note,
+  onContentChange,
+}) => {
+  const { debouncedUpdateNote } = useApp();
+
+  const handleCheckboxToggle = (lineIndex: number, lineText: string) => {
+    const lines = content.split("\n");
+
+    // Toggle the checkbox
+    let newLineText = lineText;
+    if (lineText.includes("[ ]")) {
+      newLineText = lineText.replace("[ ]", "[x]");
+    } else if (lineText.includes("[x]")) {
+      newLineText = lineText.replace("[x]", "[ ]");
+    }
+
+    // Update the line in the array
+    lines[lineIndex] = newLineText;
+    const updatedContent = lines.join("\n");
+
+    // Update parent and save
+    onContentChange(updatedContent);
+    debouncedUpdateNote(note.id, { content: updatedContent });
+  };
+
+  const renderContent = () => {
+    const lines = content.split("\n"); // Use the prop content, not local state
+    let inCodeBlock = false;
+    let codeBlockContent = "";
+    const renderedElements: React.ReactNode[] = [];
+    let lineIndex = 0;
+
+    while (lineIndex < lines.length) {
+      const line = lines[lineIndex];
+
+      // Handle code blocks
+      if (line.trim().startsWith("```")) {
+        if (!inCodeBlock) {
+          // Start of code block
+          inCodeBlock = true;
+          codeBlockContent = "";
+        } else {
+          // End of code block
+          inCodeBlock = false;
+          renderedElements.push(
+            <View
+              key={`code-${lineIndex}`}
+              style={{
+                backgroundColor: colors.backgroundCard,
+                padding: 12,
+                borderRadius: 8,
+                marginVertical: 8,
+              }}
+            >
+              <Text
+                style={{
+                  fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+                  fontSize: 14,
+                  color: colors.text,
+                }}
+              >
+                {codeBlockContent}
+              </Text>
+            </View>
+          );
+        }
+        lineIndex++;
+        continue;
+      }
+
+      if (inCodeBlock) {
+        codeBlockContent += line + "\n";
+        lineIndex++;
+        continue;
+      }
+
+      // Check for checkbox lines (must start with - [ ] or - [x])
+      const trimmedLine = line.trim();
+      if (trimmedLine.startsWith("- [ ]") || trimmedLine.startsWith("- [x]")) {
+        const isChecked = trimmedLine.includes("[x]");
+        const taskText = trimmedLine.replace(/^-\s*\[[ x]\]\s*/, "");
+
+        renderedElements.push(
+          <TouchableOpacity
+            key={`checkbox-${lineIndex}`}
+            onPress={() => handleCheckboxToggle(lineIndex, line)}
+            style={{
+              flexDirection: "row",
+              alignItems: "flex-start",
+              marginVertical: 4,
+              paddingVertical: 2,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 18,
+                marginRight: 12,
+                color: isChecked ? colors.primary : colors.text,
+              }}
+            >
+              {isChecked ? "☑" : "☐"}
+            </Text>
+            <Text
+              style={{
+                fontSize: 16,
+                lineHeight: 24,
+                flex: 1,
+                color: isChecked ? colors.textSecondary : colors.text,
+                textDecorationLine: isChecked ? "line-through" : "none",
+              }}
+            >
+              {taskText}
+            </Text>
+          </TouchableOpacity>
+        );
+        lineIndex++;
+        continue;
+      }
+
+      // For regular content, collect consecutive lines for better Markdown parsing
+      let markdownContent = "";
+      while (lineIndex < lines.length) {
+        const currentLine = lines[lineIndex];
+
+        // Stop collecting if we hit a checkbox or code block
+        if (
+          currentLine.trim().startsWith("```") ||
+          currentLine.trim().startsWith("- [ ]") ||
+          currentLine.trim().startsWith("- [x]")
+        ) {
+          break;
+        }
+
+        markdownContent += currentLine + "\n";
+        lineIndex++;
+      }
+
+      if (markdownContent.trim()) {
+        renderedElements.push(
+          <Markdown
+            key={`md-${lineIndex}`}
+            style={{
+              body: {
+                color: colors.text,
+                fontSize: 16,
+                lineHeight: 24,
+              },
+              heading1: {
+                fontSize: 28,
+                color: colors.primary,
+                fontWeight: "800" as const,
+                marginTop: renderedElements.length === 0 ? 0 : 24,
+                marginBottom: 12,
+              },
+              heading2: {
+                fontSize: 24,
+                fontWeight: "700" as const,
+                marginTop: 20,
+                marginBottom: 10,
+              },
+              heading3: {
+                fontSize: 20,
+                fontWeight: "600" as const,
+                marginTop: 16,
+                marginBottom: 8,
+              },
+              paragraph: {
+                marginVertical: 8,
+                lineHeight: 24,
+              },
+              strong: { fontWeight: "700" as const },
+              em: { fontStyle: "italic" as const },
+              bullet_list: {
+                marginVertical: 8,
+                marginLeft: 20,
+              },
+              ordered_list: {
+                marginVertical: 8,
+                marginLeft: 20,
+              },
+              list_item: {
+                marginVertical: 4,
+              },
+              code_inline: {
+                backgroundColor: colors.backgroundCard,
+                paddingHorizontal: 4,
+                paddingVertical: 2,
+                borderRadius: 4,
+                fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+              },
+              blockquote: {
+                backgroundColor: colors.backgroundCard,
+                borderLeftWidth: 4,
+                borderLeftColor: colors.primary,
+                paddingLeft: 12,
+                paddingVertical: 8,
+                marginVertical: 8,
+              },
+              hr: {
+                backgroundColor: colors.border,
+                height: 1,
+                marginVertical: 16,
+              },
+            }}
+          >
+            {markdownContent}
+          </Markdown>
+        );
+      }
+    }
+
+    return renderedElements;
+  };
+
+  return <View>{renderContent()}</View>;
+};
+
 const NoteEditorScreen: React.FC = () => {
   const { width } = useWindowDimensions();
   const showButtonText = width >= 420;
@@ -349,239 +577,16 @@ const NoteEditorScreen: React.FC = () => {
                       paddingBottom: 120,
                     }}
                   >
-                    <Markdown
-                      style={{
-                        body: {
-                          color: colors.text,
-                          fontSize: 16,
-                          lineHeight: 24,
-                        },
-                        heading1: {
-                          fontSize: 28,
-                          color: colors.primary,
-                          fontWeight: "800",
-                          marginTop: 24,
-                          marginBottom: 12,
-                        },
-                        heading2: {
-                          fontSize: 24,
-                          fontWeight: "700",
-                          marginTop: 20,
-                          marginBottom: 10,
-                        },
-                        heading3: {
-                          fontSize: 20,
-                          fontWeight: "600",
-                          marginTop: 16,
-                          marginBottom: 8,
-                        },
-                        paragraph: {
-                          marginVertical: 8,
-                          lineHeight: 24,
-                        },
-                        strong: { fontWeight: "700" },
-                        em: { fontStyle: "italic" },
-                        bullet_list: {
-                          marginVertical: 8,
-                          marginLeft: 20,
-                        },
-                        ordered_list: {
-                          marginVertical: 8,
-                          marginLeft: 20,
-                        },
-                        list_item: {
-                          marginVertical: 4,
-                        },
-                        code_inline: {
-                          backgroundColor: colors.backgroundCard,
-                          paddingHorizontal: 4,
-                          paddingVertical: 2,
-                          borderRadius: 4,
-                          fontFamily:
-                            Platform.OS === "ios" ? "Menlo" : "monospace",
-                        },
-                        code_block: {
-                          backgroundColor: colors.backgroundCard,
-                          padding: 12,
-                          borderRadius: 8,
-                          marginVertical: 8,
-                          fontFamily:
-                            Platform.OS === "ios" ? "Menlo" : "monospace",
-                        },
-                        blockquote: {
-                          backgroundColor: colors.backgroundCard,
-                          borderLeftWidth: 4,
-                          borderLeftColor: colors.primary,
-                          paddingLeft: 12,
-                          paddingVertical: 8,
-                          marginVertical: 8,
-                        },
-                        hr: {
-                          backgroundColor: colors.border,
-                          height: 1,
-                          marginVertical: 16,
-                        },
-                      }}
-                      rules={{
-                        // Override the bullet_list renderer to handle task lists
-                        bullet_list: (node, children, parent, styles) => {
-                          const childrenArray =
-                            React.Children.toArray(children);
-
-                          // Check if any child is a task list item
-                          const hasTaskItems = childrenArray.some(
-                            (child: any) => {
-                              const childText =
-                                child.props?.children?.[1]?.props?.children ||
-                                "";
-                              return (
-                                typeof childText === "string" &&
-                                (childText.includes("[ ]") ||
-                                  childText.includes("[x]"))
-                              );
-                            }
-                          );
-
-                          if (hasTaskItems) {
-                            // Process task list items
-                            const processedChildren = childrenArray.map(
-                              (child: any, index) => {
-                                const childProps = child.props || {};
-                                const childText =
-                                  childProps.children?.[1]?.props?.children ||
-                                  "";
-
-                                if (
-                                  typeof childText === "string" &&
-                                  (childText.includes("[ ]") ||
-                                    childText.includes("[x]"))
-                                ) {
-                                  const isChecked = childText.includes("[x]");
-                                  const taskText = childText.replace(
-                                    /\[[ x]\]\s*/,
-                                    ""
-                                  );
-
-                                  return (
-                                    <TouchableOpacity
-                                      key={`task-${index}`}
-                                      onPress={() => {
-                                        // Find the exact line in the content
-                                        const lines = content.split("\n");
-                                        for (let i = 0; i < lines.length; i++) {
-                                          const line = lines[i];
-                                          if (line.includes(childText.trim())) {
-                                            // Toggle the checkbox
-                                            if (line.includes("[ ]")) {
-                                              lines[i] = line.replace(
-                                                "[ ]",
-                                                "[x]"
-                                              );
-                                            } else if (line.includes("[x]")) {
-                                              lines[i] = line.replace(
-                                                "[x]",
-                                                "[ ]"
-                                              );
-                                            }
-                                            break;
-                                          }
-                                        }
-
-                                        const updatedContent = lines.join("\n");
-                                        setContent(updatedContent);
-                                        setHasUnsavedChanges(true);
-                                        debouncedUpdateNote(note.id, {
-                                          content: updatedContent,
-                                        });
-                                      }}
-                                      style={{
-                                        flexDirection: "row",
-                                        alignItems: "flex-start",
-                                        marginVertical: 4,
-                                        paddingVertical: 2,
-                                      }}
-                                    >
-                                      <Text
-                                        style={{
-                                          fontSize: 18,
-                                          marginRight: 12,
-                                          color: isChecked
-                                            ? colors.primary
-                                            : colors.text,
-                                        }}
-                                      >
-                                        {isChecked ? "☑" : "☐"}
-                                      </Text>
-                                      <Text
-                                        style={{
-                                          fontSize: 16,
-                                          lineHeight: 24,
-                                          flex: 1,
-                                          color: isChecked
-                                            ? colors.textSecondary
-                                            : colors.text,
-                                          textDecorationLine: isChecked
-                                            ? "line-through"
-                                            : "none",
-                                        }}
-                                      >
-                                        {taskText}
-                                      </Text>
-                                    </TouchableOpacity>
-                                  );
-                                }
-
-                                // Return regular list item
-                                return child;
-                              }
-                            );
-
-                            return (
-                              <View key={node.key} style={styles.bullet_list}>
-                                {processedChildren}
-                              </View>
-                            );
-                          }
-
-                          // Regular bullet list
-                          return (
-                            <View key={node.key} style={styles.bullet_list}>
-                              {children}
-                            </View>
-                          );
-                        },
-
-                        // Override list_item for regular items (non-task items)
-                        list_item: (node, children, parent, styles) => {
-                          return (
-                            <View
-                              key={node.key}
-                              style={{
-                                flexDirection: "row",
-                                alignItems: "flex-start",
-                                marginVertical: 4,
-                                paddingVertical: 2,
-                              }}
-                            >
-                              <Text style={{ fontSize: 16, marginRight: 12 }}>
-                                •
-                              </Text>
-                              <Text
-                                style={{
-                                  fontSize: 16,
-                                  lineHeight: 24,
-                                  flex: 1,
-                                }}
-                              >
-                                {children}
-                              </Text>
-                            </View>
-                          );
-                        },
-                      }}
-                    >
-                      {content}
-                    </Markdown>
+                    {note && (
+                      <MarkdownRenderer
+                        content={content}
+                        note={note}
+                        onContentChange={(newContent) => {
+                          setContent(newContent);
+                          setHasUnsavedChanges(true);
+                        }}
+                      />
+                    )}
                   </ScrollView>
                 ) : (
                   <ScrollView
@@ -607,7 +612,7 @@ const NoteEditorScreen: React.FC = () => {
                         color: colors.text,
                         fontFamily:
                           Platform.OS === "ios" ? "Menlo" : "monospace",
-                        lineHeight: 22,
+                        lineHeight: 24,
                         includeFontPadding: false,
                         textAlignVertical: "top",
                         minHeight: 350,
