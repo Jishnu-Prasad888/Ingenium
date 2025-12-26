@@ -361,23 +361,22 @@ const NoteEditorScreen: React.FC = () => {
                           color: colors.primary,
                           fontWeight: "800",
                           marginTop: 24,
-                          paddingBottom: 1,
-                          marginBottom: 2,
+                          marginBottom: 12,
                         },
                         heading2: {
                           fontSize: 24,
                           fontWeight: "700",
                           marginTop: 20,
-                          marginBottom: 1,
+                          marginBottom: 10,
                         },
                         heading3: {
                           fontSize: 20,
                           fontWeight: "600",
                           marginTop: 16,
-                          marginBottom: 1,
+                          marginBottom: 8,
                         },
                         paragraph: {
-                          marginVertical: 4,
+                          marginVertical: 8,
                           lineHeight: 24,
                         },
                         strong: { fontWeight: "700" },
@@ -424,36 +423,159 @@ const NoteEditorScreen: React.FC = () => {
                         },
                       }}
                       rules={{
-                        checkbox: (node, children) => {
-                          const checked = (node as any).checked === true;
+                        // Override the bullet_list renderer to handle task lists
+                        bullet_list: (node, children, parent, styles) => {
+                          const childrenArray =
+                            React.Children.toArray(children);
 
+                          // Check if any child is a task list item
+                          const hasTaskItems = childrenArray.some(
+                            (child: any) => {
+                              const childText =
+                                child.props?.children?.[1]?.props?.children ||
+                                "";
+                              return (
+                                typeof childText === "string" &&
+                                (childText.includes("[ ]") ||
+                                  childText.includes("[x]"))
+                              );
+                            }
+                          );
+
+                          if (hasTaskItems) {
+                            // Process task list items
+                            const processedChildren = childrenArray.map(
+                              (child: any, index) => {
+                                const childProps = child.props || {};
+                                const childText =
+                                  childProps.children?.[1]?.props?.children ||
+                                  "";
+
+                                if (
+                                  typeof childText === "string" &&
+                                  (childText.includes("[ ]") ||
+                                    childText.includes("[x]"))
+                                ) {
+                                  const isChecked = childText.includes("[x]");
+                                  const taskText = childText.replace(
+                                    /\[[ x]\]\s*/,
+                                    ""
+                                  );
+
+                                  return (
+                                    <TouchableOpacity
+                                      key={`task-${index}`}
+                                      onPress={() => {
+                                        // Find the exact line in the content
+                                        const lines = content.split("\n");
+                                        for (let i = 0; i < lines.length; i++) {
+                                          const line = lines[i];
+                                          if (line.includes(childText.trim())) {
+                                            // Toggle the checkbox
+                                            if (line.includes("[ ]")) {
+                                              lines[i] = line.replace(
+                                                "[ ]",
+                                                "[x]"
+                                              );
+                                            } else if (line.includes("[x]")) {
+                                              lines[i] = line.replace(
+                                                "[x]",
+                                                "[ ]"
+                                              );
+                                            }
+                                            break;
+                                          }
+                                        }
+
+                                        const updatedContent = lines.join("\n");
+                                        setContent(updatedContent);
+                                        setHasUnsavedChanges(true);
+                                        debouncedUpdateNote(note.id, {
+                                          content: updatedContent,
+                                        });
+                                      }}
+                                      style={{
+                                        flexDirection: "row",
+                                        alignItems: "flex-start",
+                                        marginVertical: 4,
+                                        paddingVertical: 2,
+                                      }}
+                                    >
+                                      <Text
+                                        style={{
+                                          fontSize: 18,
+                                          marginRight: 12,
+                                          color: isChecked
+                                            ? colors.primary
+                                            : colors.text,
+                                        }}
+                                      >
+                                        {isChecked ? "☑" : "☐"}
+                                      </Text>
+                                      <Text
+                                        style={{
+                                          fontSize: 16,
+                                          lineHeight: 24,
+                                          flex: 1,
+                                          color: isChecked
+                                            ? colors.textSecondary
+                                            : colors.text,
+                                          textDecorationLine: isChecked
+                                            ? "line-through"
+                                            : "none",
+                                        }}
+                                      >
+                                        {taskText}
+                                      </Text>
+                                    </TouchableOpacity>
+                                  );
+                                }
+
+                                // Return regular list item
+                                return child;
+                              }
+                            );
+
+                            return (
+                              <View key={node.key} style={styles.bullet_list}>
+                                {processedChildren}
+                              </View>
+                            );
+                          }
+
+                          // Regular bullet list
                           return (
-                            <TouchableOpacity
-                              key={(node as any).key}
-                              onPress={() => {
-                                const updated = content.replace(
-                                  checked ? "- [x]" : "- [ ]",
-                                  checked ? "- [ ]" : "- [x]"
-                                );
-                                setContent(updated);
-                                setHasUnsavedChanges(true);
-                                debouncedUpdateNote(note.id, {
-                                  content: updated,
-                                });
-                              }}
+                            <View key={node.key} style={styles.bullet_list}>
+                              {children}
+                            </View>
+                          );
+                        },
+
+                        // Override list_item for regular items (non-task items)
+                        list_item: (node, children, parent, styles) => {
+                          return (
+                            <View
+                              key={node.key}
                               style={{
                                 flexDirection: "row",
-                                alignItems: "center",
+                                alignItems: "flex-start",
                                 marginVertical: 4,
+                                paddingVertical: 2,
                               }}
                             >
-                              <Text style={{ fontSize: 16, marginRight: 8 }}>
-                                {checked ? "☑" : "☐"}
+                              <Text style={{ fontSize: 16, marginRight: 12 }}>
+                                •
                               </Text>
-                              <Text style={{ fontSize: 16, lineHeight: 24 }}>
+                              <Text
+                                style={{
+                                  fontSize: 16,
+                                  lineHeight: 24,
+                                  flex: 1,
+                                }}
+                              >
                                 {children}
                               </Text>
-                            </TouchableOpacity>
+                            </View>
                           );
                         },
                       }}
