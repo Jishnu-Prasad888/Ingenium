@@ -20,6 +20,9 @@ import DeleteConfirmationPopup from "../components/DeleteConfirmationPopup";
 import { colors } from "../theme/colors";
 import { formatDate } from "../utils/helpers";
 import Markdown from "react-native-markdown-display";
+import { Modal } from "react-native";
+import { ExternalLink, Maximize2, CircleX } from "lucide-react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 // Define props interface for MarkdownRenderer
 interface MarkdownRendererProps {
@@ -272,12 +275,13 @@ const NoteEditorScreen: React.FC = () => {
   const lastSavedRef = useRef<number>(Date.now());
   const contentInputRef = useRef<TextInput>(null);
   const [selection, setSelection] = useState({ start: 0, end: 0 });
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   const FormatButton = ({
     label,
     onPress,
   }: {
-    label: string;
+    label: string | React.ReactNode;
     onPress: () => void;
   }) => (
     <TouchableOpacity
@@ -292,17 +296,14 @@ const NoteEditorScreen: React.FC = () => {
         borderColor: colors.textSecondary,
         alignItems: "center",
         justifyContent: "center",
+        minWidth: 42,
       }}
     >
-      <Text
-        style={{
-          color: colors.text,
-          fontWeight: "600",
-          lineHeight: 16,
-        }}
-      >
-        {label}
-      </Text>
+      {typeof label === "string" ? (
+        <Text style={{ color: colors.text, fontWeight: "600" }}>{label}</Text>
+      ) : (
+        label
+      )}
     </TouchableOpacity>
   );
 
@@ -649,6 +650,10 @@ const NoteEditorScreen: React.FC = () => {
                   label={isPreview ? "Edit" : "Preview"}
                   onPress={() => setIsPreview((p) => !p)}
                 />
+                <FormatButton
+                  label={<ExternalLink size={16} color={colors.text} />}
+                  onPress={() => setIsFullscreen(true)}
+                />
                 <FormatButton label="H1" onPress={() => insertMarkdown("# ")} />
                 <FormatButton
                   label="H2"
@@ -844,6 +849,68 @@ const NoteEditorScreen: React.FC = () => {
           )}
         </TouchableOpacity>
       </View>
+      <Modal
+        visible={isFullscreen}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => setIsFullscreen(false)}
+      >
+        <SafeAreaView
+          style={{
+            flex: 1,
+            backgroundColor: colors.background,
+            paddingTop: Platform.OS === "ios" ? 60 : 20,
+          }}
+        >
+          {/* Header */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              paddingHorizontal: 16,
+              paddingBottom: 12,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.border,
+            }}
+          >
+            <Maximize2 size={18} color={colors.textSecondary} />
+
+            <TouchableOpacity onPress={() => setIsFullscreen(false)}>
+              <CircleX size={26} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Content */}
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{
+              padding: 20,
+              paddingBottom: 40,
+            }}
+          >
+            {isPreview ? (
+              <MarkdownRenderer
+                content={content}
+                note={note}
+                onContentChange={() => {}}
+              />
+            ) : (
+              <Text
+                selectable
+                style={{
+                  fontSize: 16,
+                  lineHeight: 24,
+                  color: colors.text,
+                  fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
+                }}
+              >
+                {content}
+              </Text>
+            )}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </View>
   );
 };

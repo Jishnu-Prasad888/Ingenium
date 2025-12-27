@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { View, ActivityIndicator, Text } from "react-native";
 import { AppProvider, useApp } from "./src/context/AppContext";
 import { colors } from "./src/theme/colors";
@@ -11,32 +11,43 @@ const AppWrapper: React.FC = () => <AppContent />;
 
 const IncomingContentHandler: React.FC = () => {
   const { processIncomingShare } = useApp();
+  const handledRef = useRef(false);
+
   const { hasShareIntent, shareIntent } = useShareIntent({
     resetOnBackground: true,
   });
 
-  // Handle share intents from other apps
+  const safeProcessIncoming = (content: string) => {
+    if (handledRef.current) return;
+    handledRef.current = true;
+    processIncomingShare(content);
+  };
+
+  // Handle share intents
   useEffect(() => {
     if (hasShareIntent && shareIntent?.text) {
       const text = Array.isArray(shareIntent.text)
         ? shareIntent.text[0]
         : shareIntent.text;
-      processIncomingShare(text);
-    }
-  }, [hasShareIntent, shareIntent]);
 
-  // Handle deep links (ingenium:// or https://)
+      safeProcessIncoming(text);
+    }
+  }, [hasShareIntent, shareIntent, processIncomingShare]);
+
+  // Handle deep links
   useEffect(() => {
     const handleUrl = (url: string | null) => {
-      if (!url) return;
+      if (!url || handledRef.current) return;
 
       try {
         const parsed = Linking.parse(url);
+
         if (parsed.hostname === "share") {
           const textParam = parsed.queryParams?.text;
           if (textParam) {
             const content = Array.isArray(textParam) ? textParam[0] : textParam;
-            processIncomingShare(content);
+
+            safeProcessIncoming(content);
           }
         }
       } catch (e) {
@@ -44,10 +55,8 @@ const IncomingContentHandler: React.FC = () => {
       }
     };
 
-    // Handle initial URL
     Linking.getInitialURL().then(handleUrl);
 
-    // Listen for incoming URLs while app is running
     const subscription = Linking.addEventListener("url", ({ url }) => {
       handleUrl(url);
     });
@@ -55,7 +64,7 @@ const IncomingContentHandler: React.FC = () => {
     return () => {
       subscription.remove();
     };
-  }, []);
+  }, [processIncomingShare]);
 
   return null;
 };
