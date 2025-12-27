@@ -35,7 +35,6 @@ export const AppContent: React.FC = () => {
 
           <BottomNavigationBar />
           <SyncIndicator />
-          {__DEV__ && <DebugDatabaseInfo />}
         </>
       )}
     </View>
