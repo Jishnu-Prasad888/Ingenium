@@ -5,29 +5,34 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "scheme": "ingenium",
-    "platforms": [
-      "android"
-    ],
+    "platforms": ["android"],
+
     "icon": "./assets/images/logo.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+
     "splash": {
       "image": "./assets/images/logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#F5E6D8"
     },
+
     "ios": {
-      "bundleIdentifier": "com.thecaptainproject.ingenium",
-      "buildNumber": "1"
+      "appExtensions": []
     },
+
     "android": {
       "package": "com.thecaptainproject.ingenium",
       "versionCode": 1,
+      "jsEngine": "hermes",
+
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo.png",
         "backgroundColor": "#F5E6D8"
       },
+
       "edgeToEdgeEnabled": true,
+
       "intentFilters": [
         {
           "action": "VIEW",
@@ -36,10 +41,7 @@
               "scheme": "ingenium"
             }
           ],
-          "category": [
-            "BROWSABLE",
-            "DEFAULT"
-          ]
+          "category": ["BROWSABLE", "DEFAULT"]
         },
         {
           "action": "SEND",
@@ -48,28 +50,42 @@
               "mimeType": "text/plain"
             }
           ],
-          "category": [
-            "DEFAULT"
-          ]
+          "category": ["DEFAULT"]
         }
       ]
     },
+
     "web": {
       "bundler": "metro",
       "output": "static",
       "favicon": "./assets/images/logo.png"
     },
+
     "plugins": [
       [
         "expo-font",
         {
-          "fonts": [
-            "./assets/fonts/logo.ttf"
-          ]
+          "fonts": ["./assets/fonts/logo.ttf"]
         }
       ],
       "expo-sqlite",
-      "expo-share-intent"
-    ]
+      [
+        "expo-share-intent",
+        {
+          "android": {
+            "enabled": true
+          },
+          "ios": {
+            "enabled": false
+          }
+        }
+      ]
+    ],
+
+    "extra": {
+      "eas": {
+        "projectId": "654e8ea2-4ad0-4eb6-a145-3cd135a17823"
+      }
+    }
   }
 }
