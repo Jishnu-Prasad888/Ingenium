@@ -6,31 +6,19 @@
     "orientation": "portrait",
     "scheme": "ingenium",
     "platforms": [
-      "ios",
       "android"
     ],
     "icon": "./assets/images/logo.png",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": false,
+    "newArchEnabled": true,
     "splash": {
       "image": "./assets/images/logo.png",
       "resizeMode": "contain",
       "backgroundColor": "#F5E6D8"
     },
     "ios": {
-      "supportsTablet": true,
       "bundleIdentifier": "com.thecaptainproject.ingenium",
-      "buildNumber": "1",
-      "infoPlist": {
-        "CFBundleURLTypes": [
-          {
-            "CFBundleURLSchemes": [
-              "ingenium"
-            ],
-            "CFBundleURLName": "Ingenium Notes"
-          }
-        ]
-      }
+      "buildNumber": "1"
     },
     "android": {
       "package": "com.thecaptainproject.ingenium",

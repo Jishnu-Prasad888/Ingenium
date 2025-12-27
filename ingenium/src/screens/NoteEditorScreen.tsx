@@ -93,7 +93,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
       const trimmedLine = line.trim();
       const checkboxLineIndex = lineIndex;
       if (/^-\s*\[( |x|X)\]/.test(trimmedLine)) {
-        const isChecked = trimmedLine.includes("[x]");
+        const isChecked = /^-\s*\[[xX]\]/.test(trimmedLine);
         const taskText = trimmedLine.replace(/^-\s*\[[ x]\]\s*/, "");
 
         renderedElements.push(
@@ -116,9 +116,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
               }
 
               const updatedContent = linesCopy.join("\n");
-
               onContentChange(updatedContent);
-              debouncedUpdateNote(note.id, { content: updatedContent });
             }}
             style={({ pressed }) => ({
               flexDirection: "row",
@@ -583,7 +581,8 @@ const NoteEditorScreen: React.FC = () => {
                       <MarkdownRenderer
                         content={content}
                         note={note}
-                        key={`markdown-${content}-${Date.now()}`} // Force re-render on content change
+                        key={`markdown-${note.id}`}
+                        // Force re-render on content change
                         onContentChange={(newContent) => {
                           setContent(newContent);
                           setHasUnsavedChanges(true);
