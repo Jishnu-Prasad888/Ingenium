@@ -11,6 +11,8 @@ import { Folder, ChevronRight, Trash2 } from "lucide-react-native";
 import { colors } from "../theme/colors";
 import { useApp } from "../context/AppContext";
 import DeleteConfirmationPopup from "./DeleteConfirmationPopup";
+import RenameFolderPopup from "./RenameFolderPopup";
+import { Pencil } from "lucide-react-native";
 
 interface FolderCardProps {
   folder: any;
@@ -18,6 +20,8 @@ interface FolderCardProps {
 
 const FolderCard: React.FC<FolderCardProps> = ({ folder }) => {
   const { setCurrentFolderId, deleteFolder } = useApp();
+  const { renameFolder } = useApp();
+  const [showRenamePopup, setShowRenamePopup] = useState(false);
 
   const [showDeletePopup, setShowDeletePopup] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -95,6 +99,11 @@ const FolderCard: React.FC<FolderCardProps> = ({ folder }) => {
     inputRange: [-1, 1],
     outputRange: ["-8deg", "8deg"],
   });
+
+  const handleRenameConfirm = async (newName: string) => {
+    await renameFolder(folder.id, newName);
+    setShowRenamePopup(false);
+  };
 
   return (
     <>
@@ -199,6 +208,25 @@ const FolderCard: React.FC<FolderCardProps> = ({ folder }) => {
             <Trash2 size={16} color={colors.textSecondary} />
           </Animated.View>
         </Pressable>
+
+        <Pressable
+          onPress={() => setShowRenamePopup(true)}
+          style={{
+            position: "absolute",
+            top: 12,
+            right: 48,
+            width: 28,
+            height: 28,
+            borderRadius: 16,
+            backgroundColor: colors.backgroundAlt,
+            borderWidth: 1,
+            borderColor: colors.border,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Pencil size={14} color={colors.textSecondary} />
+        </Pressable>
       </TouchableOpacity>
 
       <DeleteConfirmationPopup
@@ -208,6 +236,13 @@ const FolderCard: React.FC<FolderCardProps> = ({ folder }) => {
         title="Delete Folder"
         message="Are you sure you want to delete this folder and all its contents?"
         itemName={folder.name || "Unnamed Folder"}
+      />
+
+      <RenameFolderPopup
+        visible={showRenamePopup}
+        initialName={folder.name}
+        onConfirm={handleRenameConfirm}
+        onCancel={() => setShowRenamePopup(false)}
       />
     </>
   );

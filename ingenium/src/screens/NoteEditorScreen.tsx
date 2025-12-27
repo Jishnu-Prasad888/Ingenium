@@ -10,7 +10,6 @@ import {
   useWindowDimensions,
   KeyboardAvoidingView,
   Platform,
-  TextStyle,
   Pressable,
 } from "react-native";
 import { ChevronLeft, Share2, Save, Trash2 } from "lucide-react-native";
@@ -24,42 +23,60 @@ import { Modal } from "react-native";
 import { ExternalLink, Maximize2, CircleX } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-// Define props interface for MarkdownRenderer
 interface MarkdownRendererProps {
   content: string;
-  note: any;
   onContentChange: (content: string) => void;
 }
 
-// Custom Markdown Renderer with Checkbox Support
 const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   content,
-  note,
   onContentChange,
 }) => {
-  const { debouncedUpdateNote } = useApp();
+  const handleCheckboxToggle = (lineIndex: number) => {
+    const lines = content.split("\n");
 
-  // Use useMemo to memoize the rendered content
-  const renderedContent = React.useMemo(() => {
+    if (lineIndex < 0 || lineIndex >= lines.length) return;
+
+    const line = lines[lineIndex];
+    if (!line) return;
+
+    // Toggle checkbox state - match against the full line, not just trimmed
+    if (/^[\s]*-\s*\[ \]/.test(line)) {
+      // Change from [ ] to [x]
+      lines[lineIndex] = line.replace(/(^[\s]*-\s*)\[ \]/, "$1[x]");
+    } else if (/^[\s]*-\s*\[[xX]\]/.test(line)) {
+      // Change from [x] to [ ]
+      lines[lineIndex] = line.replace(/(^[\s]*-\s*)\[[xX]\]/, "$1[ ]");
+    } else {
+      // Not a checkbox line, do nothing
+      return;
+    }
+
+    // Join back and update content
+    const newContent = lines.join("\n");
+    onContentChange(newContent);
+  };
+
+  const renderContent = () => {
     const lines = content.split("\n");
     let inCodeBlock = false;
     let codeBlockContent = "";
     const renderedElements: React.ReactNode[] = [];
-    let lineIndex = 0;
 
-    while (lineIndex < lines.length) {
-      const line = lines[lineIndex];
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
 
       // Handle code blocks
       if (line.trim().startsWith("```")) {
         if (!inCodeBlock) {
           inCodeBlock = true;
           codeBlockContent = "";
+          continue;
         } else {
           inCodeBlock = false;
           renderedElements.push(
             <View
-              key={`code-${lineIndex}`}
+              key={`code-${i}`}
               style={{
                 backgroundColor: colors.backgroundCard,
                 padding: 12,
@@ -78,45 +95,33 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
               </Text>
             </View>
           );
+          continue;
         }
-        lineIndex++;
-        continue;
       }
 
       if (inCodeBlock) {
         codeBlockContent += line + "\n";
-        lineIndex++;
         continue;
       }
 
-      // Check for checkbox lines
+      // Handle checkboxes
       const trimmedLine = line.trim();
-      const checkboxLineIndex = lineIndex;
-      if (/^-\s*\[( |x|X)\]/.test(trimmedLine)) {
-        const isChecked = /^-\s*\[[xX]\]/.test(trimmedLine);
-        const taskText = trimmedLine.replace(/^-\s*\[[ x]\]\s*/, "");
+      const isCheckbox = /^-\s*\[[ xX]\]/.test(trimmedLine);
+
+      if (isCheckbox) {
+        const checkboxMatch = trimmedLine.match(/^-\s*\[([ xX])\]/);
+        const isChecked = checkboxMatch
+          ? checkboxMatch[1].toLowerCase() === "x"
+          : false;
+        const textAfterCheckbox = trimmedLine.replace(/^-\s*\[[ xX]\]\s*/, "");
+        const currentLineIndex = i;
 
         renderedElements.push(
           <Pressable
-            key={`checkbox-${lineIndex}`}
+            key={`checkbox-${i}-${isChecked}`}
             onPress={() => {
-              const linesCopy = content.split("\n");
-              const originalLine = linesCopy[checkboxLineIndex];
-
-              if (/^-\s*\[ \]/.test(originalLine)) {
-                linesCopy[checkboxLineIndex] = originalLine.replace(
-                  /^-\s*\[ \]/,
-                  "- [x]"
-                );
-              } else if (/^-\s*\[[xX]\]/.test(originalLine)) {
-                linesCopy[checkboxLineIndex] = originalLine.replace(
-                  /^-\s*\[[xX]\]/,
-                  "- [ ]"
-                );
-              }
-
-              const updatedContent = linesCopy.join("\n");
-              onContentChange(updatedContent);
+              console.log("Toggling checkbox at line:", currentLineIndex);
+              handleCheckboxToggle(currentLineIndex);
             }}
             style={({ pressed }) => ({
               flexDirection: "row",
@@ -130,6 +135,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
               style={{
                 fontSize: 18,
                 marginRight: 12,
+                marginTop: 2,
                 color: isChecked ? colors.primary : colors.text,
               }}
             >
@@ -144,46 +150,37 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                 textDecorationLine: isChecked ? "line-through" : "none",
               }}
             >
-              {taskText}
+              {textAfterCheckbox}
             </Text>
           </Pressable>
         );
-        lineIndex++;
         continue;
       }
 
-      // For regular content
+      // Handle normal markdown - collect consecutive non-checkbox, non-code lines
       let markdownContent = "";
-      while (lineIndex < lines.length) {
-        const currentLine = lines[lineIndex];
-
-        if (
-          currentLine.trim().startsWith("```") ||
-          currentLine.trim().startsWith("- [ ]") ||
-          currentLine.trim().startsWith("- [x]")
-        ) {
-          break;
-        }
-
-        markdownContent += currentLine + "\n";
-        lineIndex++;
+      let startLine = i;
+      while (
+        i < lines.length &&
+        !lines[i].trim().startsWith("```") &&
+        !/^-\s*\[[ xX]\]/.test(lines[i].trim())
+      ) {
+        markdownContent += lines[i] + "\n";
+        i++;
       }
+      i--; // Step back one since the loop will increment
 
       if (markdownContent.trim()) {
         renderedElements.push(
           <Markdown
-            key={`md-${lineIndex}`}
+            key={`md-${startLine}`}
             style={{
-              body: {
-                color: colors.text,
-                fontSize: 16,
-                lineHeight: 24,
-              },
+              body: { color: colors.text, fontSize: 16, lineHeight: 24 },
               heading1: {
                 fontSize: 28,
                 color: colors.primary,
                 fontWeight: "800" as const,
-                marginTop: renderedElements.length === 0 ? 0 : 24,
+                marginTop: 24,
                 marginBottom: 12,
               },
               heading2: {
@@ -198,23 +195,9 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                 marginTop: 16,
                 marginBottom: 8,
               },
-              paragraph: {
-                marginVertical: 8,
-                lineHeight: 24,
-              },
-              strong: { fontWeight: "700" as const },
-              em: { fontStyle: "italic" as const },
-              bullet_list: {
-                marginVertical: 8,
-                marginLeft: 20,
-              },
-              ordered_list: {
-                marginVertical: 8,
-                marginLeft: 20,
-              },
-              list_item: {
-                marginVertical: 4,
-              },
+              bullet_list: { marginVertical: 8, marginLeft: 20 },
+              ordered_list: { marginVertical: 8, marginLeft: 20 },
+              list_item: { marginVertical: 4 },
               code_inline: {
                 backgroundColor: colors.backgroundCard,
                 paddingHorizontal: 4,
@@ -244,9 +227,9 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
     }
 
     return renderedElements;
-  }, [content, note.id, debouncedUpdateNote, onContentChange]); // Re-run when content changes
+  };
 
-  return <View>{renderedContent}</View>;
+  return <View>{renderContent()}</View>;
 };
 
 const NoteEditorScreen: React.FC = () => {
@@ -362,6 +345,8 @@ const NoteEditorScreen: React.FC = () => {
 
   // Handle delete button press
   const handleDeletePress = () => {
+    if (!note) return;
+
     if (hasUnsavedChanges) {
       // Save changes before showing delete confirmation
       flushPendingSaves().then(() => {
@@ -369,6 +354,66 @@ const NoteEditorScreen: React.FC = () => {
       });
     } else {
       setShowDeletePopup(true);
+    }
+  };
+
+  const handleContentChange = (text: string) => {
+    if (!note) return;
+
+    setContent(text);
+    setHasUnsavedChanges(true);
+    debouncedUpdateNote(note.id, { content: text });
+  };
+
+  const handleTitleChange = (text: string) => {
+    if (!note) return;
+
+    setTitle(text);
+    setHasUnsavedChanges(true);
+    debouncedUpdateNote(note.id, { title: text });
+  };
+
+  const handleSaveNow = async () => {
+    if (!note) return;
+
+    await flushPendingSaves();
+    setHasUnsavedChanges(false);
+    lastSavedRef.current = Date.now();
+  };
+
+  const handleBack = async () => {
+    // Save any pending changes before navigating away
+    await flushPendingSaves();
+    setCurrentScreen("notes-list");
+  };
+
+  const handleShare = async () => {
+    if (!note) return;
+
+    // Ensure all changes are saved before sharing
+    await flushPendingSaves();
+
+    try {
+      await Share.share({
+        message: `${title}\n\n${content}`,
+        title: title || "Note",
+      });
+    } catch (error) {
+      console.error("Error sharing note:", error);
+    }
+  };
+
+  // Calculate time since last save
+  const getLastSaveText = () => {
+    const secondsAgo = Math.floor((Date.now() - lastSavedRef.current) / 1000);
+
+    if (secondsAgo < 5) {
+      return "Just now";
+    } else if (secondsAgo < 60) {
+      return `${secondsAgo}s ago`;
+    } else {
+      const minutesAgo = Math.floor(secondsAgo / 60);
+      return `${minutesAgo}m ago`;
     }
   };
 
@@ -402,58 +447,6 @@ const NoteEditorScreen: React.FC = () => {
 
   const folder = folders.find((f) => f.id === note.folderId);
   const folderPath = folder ? `/.../${folder.name}` : "/";
-
-  const handleTitleChange = (text: string) => {
-    setTitle(text);
-    setHasUnsavedChanges(true);
-    debouncedUpdateNote(note.id, { title: text });
-  };
-
-  const handleContentChange = (text: string) => {
-    setContent(text);
-    setHasUnsavedChanges(true);
-    debouncedUpdateNote(note.id, { content: text });
-  };
-
-  const handleSaveNow = async () => {
-    await flushPendingSaves();
-    setHasUnsavedChanges(false);
-    lastSavedRef.current = Date.now();
-  };
-
-  const handleBack = async () => {
-    // Save any pending changes before navigating away
-    await flushPendingSaves();
-    setCurrentScreen("notes-list");
-  };
-
-  const handleShare = async () => {
-    // Ensure all changes are saved before sharing
-    await flushPendingSaves();
-
-    try {
-      await Share.share({
-        message: `${title}\n\n${content}`,
-        title: title || "Note",
-      });
-    } catch (error) {
-      console.error("Error sharing note:", error);
-    }
-  };
-
-  // Calculate time since last save
-  const getLastSaveText = () => {
-    const secondsAgo = Math.floor((Date.now() - lastSavedRef.current) / 1000);
-
-    if (secondsAgo < 5) {
-      return "Just now";
-    } else if (secondsAgo < 60) {
-      return `${secondsAgo}s ago`;
-    } else {
-      const minutesAgo = Math.floor(secondsAgo / 60);
-      return `${minutesAgo}m ago`;
-    }
-  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -498,7 +491,7 @@ const NoteEditorScreen: React.FC = () => {
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 0} // header height
+        keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 0}
       >
         <View style={{ flex: 1, paddingHorizontal: 20, marginBottom: 10 }}>
           <View
@@ -565,7 +558,7 @@ const NoteEditorScreen: React.FC = () => {
                   borderRadius: 16,
                   overflow: "hidden",
                   marginTop: 8,
-                  marginBottom: 12, // space for toolbar
+                  marginBottom: 12,
                 }}
               >
                 {isPreview ? (
@@ -577,18 +570,10 @@ const NoteEditorScreen: React.FC = () => {
                       paddingBottom: 120,
                     }}
                   >
-                    {note && (
-                      <MarkdownRenderer
-                        content={content}
-                        note={note}
-                        key={`markdown-${note.id}`}
-                        // Force re-render on content change
-                        onContentChange={(newContent) => {
-                          setContent(newContent);
-                          setHasUnsavedChanges(true);
-                        }}
-                      />
-                    )}
+                    <MarkdownRenderer
+                      content={content}
+                      onContentChange={handleContentChange}
+                    />
                   </ScrollView>
                 ) : (
                   <ScrollView
@@ -848,6 +833,7 @@ const NoteEditorScreen: React.FC = () => {
           )}
         </TouchableOpacity>
       </View>
+
       <Modal
         visible={isFullscreen}
         animationType="slide"
@@ -891,8 +877,7 @@ const NoteEditorScreen: React.FC = () => {
             {isPreview ? (
               <MarkdownRenderer
                 content={content}
-                note={note}
-                onContentChange={() => {}}
+                onContentChange={handleContentChange}
               />
             ) : (
               <Text

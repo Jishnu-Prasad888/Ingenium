@@ -46,6 +46,7 @@ interface AppContextType {
   setIsSharing: (sharing: boolean) => void;
   processIncomingShare: (content: string) => Promise<void>;
   clearSharedContent: () => void;
+  renameFolder: (folderId: string, newName: string) => Promise<boolean>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -91,6 +92,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       console.error("Error loading data:", error);
     }
   }, []);
+
+  const renameFolder = async (folderId: string, newName: string) => {
+    setFolders((prev) =>
+      prev.map((f) => (f.id === folderId ? { ...f, name: newName } : f))
+    );
+    return true;
+  };
 
   // Initial sync function
   const performInitialSync = useCallback(async () => {
@@ -541,6 +549,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     setIsSharing,
     processIncomingShare,
     clearSharedContent,
+    renameFolder,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
