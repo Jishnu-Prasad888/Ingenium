@@ -14,7 +14,6 @@ import {
 } from "react-native";
 import { ChevronLeft, Share2, Save, Trash2 } from "lucide-react-native";
 import { useApp } from "../context/AppContext";
-import Header from "../components/Header";
 import DeleteConfirmationPopup from "../components/DeleteConfirmationPopup";
 import { colors } from "../theme/colors";
 import { formatDate } from "../utils/helpers";
@@ -449,9 +448,9 @@ const NoteEditorScreen: React.FC = () => {
   const folderPath = folder ? `/.../${folder.name}` : "/";
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <Header />
-
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: colors.background, paddingTop: 20 }}
+    >
       {/* Delete Confirmation Popup */}
       <DeleteConfirmationPopup
         visible={showDeletePopup}
@@ -525,7 +524,7 @@ const NoteEditorScreen: React.FC = () => {
                 flexDirection: "row",
                 justifyContent: "space-between",
                 alignItems: "center",
-                marginBottom: 12,
+                marginBottom: 8,
               }}
             >
               <View>
@@ -555,10 +554,10 @@ const NoteEditorScreen: React.FC = () => {
                 style={{
                   flex: 1,
                   backgroundColor: colors.backgroundAlt,
-                  borderRadius: 16,
+                  borderRadius: 12,
                   overflow: "hidden",
                   marginTop: 8,
-                  marginBottom: 12,
+                  marginBottom: 8,
                 }}
               >
                 {isPreview ? (
@@ -616,7 +615,7 @@ const NoteEditorScreen: React.FC = () => {
                 backgroundColor: colors.backgroundAlt,
                 borderTopWidth: 1,
                 borderTopColor: colors.textSecondary,
-                paddingVertical: 6,
+                paddingVertical: 4,
               }}
             >
               <ScrollView
@@ -627,7 +626,8 @@ const NoteEditorScreen: React.FC = () => {
                   flexDirection: "row",
                   alignItems: "center",
                   gap: 8,
-                  paddingHorizontal: 12,
+                  paddingHorizontal: 10,
+                  borderRadius: 30,
                 }}
               >
                 <FormatButton
@@ -673,8 +673,8 @@ const NoteEditorScreen: React.FC = () => {
       <View
         style={{
           paddingHorizontal: 20,
-          paddingBottom: Platform.OS === "ios" ? 90 : 90,
-          paddingTop: 12,
+          paddingBottom: Platform.OS === "ios" ? 50 : 50,
+          paddingTop: 8,
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "center",
@@ -692,7 +692,7 @@ const NoteEditorScreen: React.FC = () => {
             borderRadius: 12,
             paddingLeft: 10,
             paddingRight: 20,
-            height: 45,
+            height: 40,
             alignItems: "center",
             flexDirection: "row",
             justifyContent: "center",
@@ -737,7 +737,7 @@ const NoteEditorScreen: React.FC = () => {
             width: 60,
             backgroundColor: colors.backgroundCard,
             borderRadius: 12,
-            height: 45,
+            height: 40,
             alignItems: "center",
             flexDirection: "row",
             justifyContent: "center",
@@ -767,9 +767,9 @@ const NoteEditorScreen: React.FC = () => {
             flex: 1,
             backgroundColor: colors.backgroundCard,
             borderRadius: 12,
-            paddingLeft: 14,
+            paddingLeft: 18,
             paddingRight: 20,
-            height: 45,
+            height: 40,
             alignItems: "center",
             flexDirection: "row",
             justifyContent: "center",
@@ -811,9 +811,9 @@ const NoteEditorScreen: React.FC = () => {
             flex: 1,
             backgroundColor: colors.backgroundCard,
             borderRadius: 12,
-            paddingLeft: 10,
+            paddingLeft: 14,
             paddingRight: 20,
-            height: 45,
+            height: 40,
             alignItems: "center",
             flexDirection: "row",
             justifyContent: "center",
@@ -895,7 +895,7 @@ const NoteEditorScreen: React.FC = () => {
           </ScrollView>
         </SafeAreaView>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 };
 
