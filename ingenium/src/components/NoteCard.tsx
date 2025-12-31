@@ -167,7 +167,6 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, onDelete }) => {
 };
 
 const styles = {
-  // ... existing styles
   menu: {
     position: "absolute",
     top: "100%",
@@ -210,7 +209,6 @@ const styles = {
     alignItems: "center",
     marginTop: 8,
   },
-  // ... rest of existing styles
 };
 
 export default NoteCard;

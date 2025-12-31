@@ -21,6 +21,7 @@ import Markdown from "react-native-markdown-display";
 import { Modal } from "react-native";
 import { ExternalLink, Maximize2, CircleX } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import MoveNoteModal from "../components/MoveNoteModal";
 
 interface MarkdownRendererProps {
   content: string;
@@ -256,6 +257,13 @@ const NoteEditorScreen: React.FC = () => {
   const contentInputRef = useRef<TextInput>(null);
   const [selection, setSelection] = useState({ start: 0, end: 0 });
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showMoveModal, setShowMoveModal] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
+
+  const handleMove = () => {
+    setShowMoveModal(true);
+    setShowMenu(false);
+  };
 
   const FormatButton = ({
     label,
@@ -528,9 +536,11 @@ const NoteEditorScreen: React.FC = () => {
               }}
             >
               <View>
-                <Text style={{ fontSize: 12, color: colors.textSecondary }}>
-                  Folder: {folderPath}
-                </Text>
+                <TouchableOpacity onPress={handleMove}>
+                  <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                    Folder: {folderPath}
+                  </Text>
+                </TouchableOpacity>
                 <Text style={{ fontSize: 12, color: colors.textSecondary }}>
                   Created: {formatDate(note.createdAt)}
                 </Text>
@@ -895,8 +905,61 @@ const NoteEditorScreen: React.FC = () => {
           </ScrollView>
         </SafeAreaView>
       </Modal>
+
+      <MoveNoteModal
+        visible={showMoveModal}
+        onClose={() => setShowMoveModal(false)}
+        noteId={note.id}
+        currentFolderId={note.folderId}
+        noteTitle={note.title}
+      />
     </SafeAreaView>
   );
 };
 
 export default NoteEditorScreen;
+
+const styles = {
+  menu: {
+    position: "absolute",
+    top: "100%",
+    right: 10,
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    paddingVertical: 8,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+    zIndex: 100,
+    minWidth: 150,
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  menuText: {
+    marginLeft: 12,
+    fontSize: 14,
+    color: colors.text,
+  },
+  deleteItem: {
+    borderTopWidth: 1,
+    borderTopColor: colors.borderLight,
+  },
+  deleteText: {
+    color: colors.error,
+  },
+  menuButton: {
+    padding: 4,
+  },
+  footer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 8,
+  },
+};

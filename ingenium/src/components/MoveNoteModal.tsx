@@ -32,7 +32,6 @@ const MoveNoteModal: React.FC<MoveNoteModalProps> = ({
 
   // Get all folders except the current one
   const availableFolders = folders.filter((f) => f.id !== currentFolderId);
-
   // Helper function to get folder path
   const getFolderPath = (folderId: string | null): string => {
     if (!folderId) return "/";
@@ -79,6 +78,9 @@ const MoveNoteModal: React.FC<MoveNoteModalProps> = ({
           <View style={styles.noteInfo}>
             <Text style={styles.noteTitle} numberOfLines={1}>
               "{noteTitle}"
+            </Text>
+            <Text style={styles.noteSubtitle}>
+              From : {getFolderPath(currentFolderId)}
             </Text>
             <Text style={styles.noteSubtitle}>Select destination folder:</Text>
           </View>
