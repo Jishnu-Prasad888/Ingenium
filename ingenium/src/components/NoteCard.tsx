@@ -8,12 +8,13 @@ import {
   Platform,
   UIManager,
 } from "react-native";
-import { CircleChevronRight } from "lucide-react-native";
+import { CircleChevronRight, FolderInput } from "lucide-react-native";
 import { useApp } from "../context/AppContext";
 import { colors } from "../theme/colors";
 import { formatDate } from "../utils/helpers";
 import { Note } from "../services/StorageService";
 import DeleteConfirmationPopup from "./DeleteConfirmationPopup";
+import MoveNoteModal from "./MoveNoteModal";
 
 if (
   Platform.OS === "android" &&
@@ -31,6 +32,8 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, onDelete }) => {
   const { setCurrentNoteId, setCurrentScreen, deleteNote } = useApp();
   const [showDeletePopup, setShowDeletePopup] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showMoveModal, setShowMoveModal] = useState(false);
+  const [showMenu, setShowMenu] = useState(false);
 
   const title = note?.title || "";
   const content = note?.content || "";
@@ -59,6 +62,11 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, onDelete }) => {
     }
   };
 
+  const handleMove = () => {
+    setShowMoveModal(true);
+    setShowMenu(false);
+  };
+
   return (
     <>
       <TouchableOpacity
@@ -74,6 +82,7 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, onDelete }) => {
         onPress={handlePress}
         disabled={isDeleting}
         activeOpacity={0.9}
+        onLongPress={handleMove}
       >
         {/* LEFT: text content */}
         <View style={{ flex: 1, paddingRight: 12 }}>
@@ -145,8 +154,63 @@ const NoteCard: React.FC<NoteCardProps> = ({ note, onDelete }) => {
         message="Are you sure you want to delete this note?"
         itemName={title || "Untitled Note"}
       />
+
+      <MoveNoteModal
+        visible={showMoveModal}
+        onClose={() => setShowMoveModal(false)}
+        noteId={note.id}
+        currentFolderId={note.folderId}
+        noteTitle={note.title}
+      />
     </>
   );
+};
+
+const styles = {
+  // ... existing styles
+  menu: {
+    position: "absolute",
+    top: "100%",
+    right: 10,
+    backgroundColor: colors.background,
+    borderRadius: 8,
+    paddingVertical: 8,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+    zIndex: 100,
+    minWidth: 150,
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  menuText: {
+    marginLeft: 12,
+    fontSize: 14,
+    color: colors.text,
+  },
+  deleteItem: {
+    borderTopWidth: 1,
+    borderTopColor: colors.borderLight,
+  },
+  deleteText: {
+    color: colors.error,
+  },
+  menuButton: {
+    padding: 4,
+  },
+  footer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 8,
+  },
+  // ... rest of existing styles
 };
 
 export default NoteCard;

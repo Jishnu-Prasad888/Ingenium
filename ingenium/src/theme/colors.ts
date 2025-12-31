@@ -16,5 +16,6 @@ export const colors = {
     success: "#4CAF50", // Optional: add success color too
     lightgreen: "#dcffdd48", // Optional: add success color too
     info: "#2196F3", // Optional: add info color
-
+    borderLight: "#a2a09fff",
+    primaryLight:"#ffa600ff"
 };

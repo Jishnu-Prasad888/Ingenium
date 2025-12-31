@@ -47,6 +47,7 @@ interface AppContextType {
   processIncomingShare: (content: string) => Promise<void>;
   clearSharedContent: () => void;
   renameFolder: (folderId: string, newName: string) => Promise<boolean>;
+  moveNote: (noteId: string, targetFolderId: string | null) => Promise<boolean>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -242,6 +243,56 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       }, 500);
     },
     [flushPendingSaves]
+  );
+
+  const moveNote = useCallback(
+    async (noteId: string, targetFolderId: string | null): Promise<boolean> => {
+      try {
+        // Find the note
+        const note = notes.find((n) => n.id === noteId);
+        if (!note) {
+          console.error("Note not found:", noteId);
+          return false;
+        }
+
+        // If already in the target folder, no need to move
+        if (note.folderId === targetFolderId) {
+          return true;
+        }
+
+        // Update local state
+        setNotes((prev) =>
+          prev.map((n) =>
+            n.id === noteId
+              ? {
+                  ...n,
+                  folderId: targetFolderId,
+                  updatedAt: Date.now(),
+                  syncStatus: "pending",
+                }
+              : n
+          )
+        );
+
+        // Save to database
+        const updatedNote = {
+          ...note,
+          folderId: targetFolderId,
+          updatedAt: Date.now(),
+          syncStatus: "pending",
+        };
+        await StorageService.saveNote(updatedNote);
+
+        console.log(
+          `Moved note "${note.title}" to folder ${targetFolderId || "root"}`
+        );
+        return true;
+      } catch (error) {
+        console.error("Error moving note:", error);
+        return false;
+      }
+    },
+    [notes]
   );
 
   // Immediate update (for when user navigates away or explicitly saves)
@@ -550,6 +601,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     processIncomingShare,
     clearSharedContent,
     renameFolder,
+    moveNote,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
