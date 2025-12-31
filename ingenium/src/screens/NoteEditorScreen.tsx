@@ -14,7 +14,6 @@ import {
 } from "react-native";
 import { ChevronLeft, Share2, Save, Trash2 } from "lucide-react-native";
 import { useApp } from "../context/AppContext";
-import Header from "../components/Header";
 import DeleteConfirmationPopup from "../components/DeleteConfirmationPopup";
 import { colors } from "../theme/colors";
 import { formatDate } from "../utils/helpers";
@@ -449,9 +448,9 @@ const NoteEditorScreen: React.FC = () => {
   const folderPath = folder ? `/.../${folder.name}` : "/";
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <Header />
-
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: colors.background, paddingTop: 20 }}
+    >
       {/* Delete Confirmation Popup */}
       <DeleteConfirmationPopup
         visible={showDeletePopup}
@@ -627,7 +626,8 @@ const NoteEditorScreen: React.FC = () => {
                   flexDirection: "row",
                   alignItems: "center",
                   gap: 8,
-                  paddingHorizontal: 12,
+                  paddingHorizontal: 10,
+                  borderRadius: 30,
                 }}
               >
                 <FormatButton
@@ -673,7 +673,7 @@ const NoteEditorScreen: React.FC = () => {
       <View
         style={{
           paddingHorizontal: 20,
-          paddingBottom: Platform.OS === "ios" ? 90 : 90,
+          paddingBottom: Platform.OS === "ios" ? 90 : 50,
           paddingTop: 12,
           flexDirection: "row",
           alignItems: "center",
@@ -895,7 +895,7 @@ const NoteEditorScreen: React.FC = () => {
           </ScrollView>
         </SafeAreaView>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 };
 
