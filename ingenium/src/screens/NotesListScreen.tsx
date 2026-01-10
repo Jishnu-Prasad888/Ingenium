@@ -1,13 +1,7 @@
 // screens/NotesListScreen.tsx
-import React, { useEffect, useRef } from "react";
-import {
-  View,
-  ScrollView,
-  TouchableOpacity,
-  Text,
-  Animated,
-} from "react-native";
-import { Plus, NotebookPen, Brain } from "lucide-react-native";
+import React, { useRef } from "react";
+import { View, ScrollView, TouchableOpacity, Text } from "react-native";
+import { Plus, Brain, Layout } from "lucide-react-native";
 import { useApp } from "../context/AppContext";
 import Header from "../components/Header";
 import SearchBar from "../components/SearchBar";
@@ -17,18 +11,24 @@ import Divider from "../components/Divider";
 import ScrollToTopButton from "../components/ScrollToTopButton";
 import { colors } from "../theme/colors";
 import { EmptyNotesState } from "../components/EmptyNotesState";
+import { useNavigation } from "@react-navigation/native";
+import { NotesListScreenNavigationProp } from "../types/navigation";
 
 const NotesListScreen: React.FC = () => {
+  const navigation = useNavigation<NotesListScreenNavigationProp>();
   const { notes, createNote, getFilteredAndSortedItems, queryNotes } = useApp();
   const scrollRef = useRef<ScrollView>(null);
 
   const allNotes = getFilteredAndSortedItems(notes, "note");
 
+  const handleCreateBoard = () => {
+    navigation.navigate("Whiteboard");
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Header />
       <SearchBar />
-
       <SortControl />
 
       <View
@@ -48,11 +48,9 @@ const NotesListScreen: React.FC = () => {
             backgroundColor: colors.backgroundCard,
             borderRadius: 12,
             flexDirection: "row" as const,
-            alignItems: "center" as const,
-            justifyContent: "center" as const,
+            alignItems: "center",
+            justifyContent: "center",
             paddingHorizontal: 14,
-
-            // Subtle depth
             shadowColor: colors.shadow,
             shadowOffset: { width: 0, height: 1 },
             shadowOpacity: 0.08,
@@ -63,15 +61,46 @@ const NotesListScreen: React.FC = () => {
           <Text
             style={{
               fontSize: 16,
-              fontWeight: "500",
+              fontWeight: "500" as const,
               color: colors.text,
               marginRight: 7,
             }}
           >
             Create a new note
           </Text>
-
           <Plus size={20} color={colors.primary} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={handleCreateBoard}
+          activeOpacity={0.8}
+          style={{
+            flex: 1,
+            height: 44,
+            backgroundColor: colors.backgroundCard,
+            borderRadius: 12,
+            flexDirection: "row" as const,
+            alignItems: "center",
+            justifyContent: "center",
+            paddingHorizontal: 14,
+            shadowColor: colors.shadow,
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.08,
+            shadowRadius: 3,
+            elevation: 1,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 16,
+              fontWeight: "500" as const,
+              color: colors.text,
+              marginRight: 7,
+            }}
+          >
+            Create a new board
+          </Text>
+          <Layout size={20} color={colors.primary} />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -102,21 +131,21 @@ const NotesListScreen: React.FC = () => {
   );
 };
 
-export default NotesListScreen;
-
 const styles = {
   button: {
     backgroundColor: colors.backgroundCard,
     borderRadius: 12,
     paddingHorizontal: 16,
     height: 40,
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
     gap: 8,
   },
   text: {
     fontSize: 16,
     color: colors.text,
-    fontWeight: "500",
+    fontWeight: "500" as const,
   },
 };
+
+export default NotesListScreen;

@@ -26,6 +26,11 @@
       "versionCode": 1,
       "jsEngine": "hermes",
 
+      "permissions": [
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ],
+
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo.png",
         "backgroundColor": "#F5E6D8"
