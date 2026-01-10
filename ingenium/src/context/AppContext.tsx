@@ -13,6 +13,7 @@ import SyncService from "../services/SyncService";
 import { generateSyncId } from "../utils/helpers";
 import * as Linking from "expo-linking";
 import { Alert } from "react-native";
+import GeminiService from "../services/GeminiService";
 
 interface AppContextType {
   folders: Folder[];
@@ -48,6 +49,7 @@ interface AppContextType {
   clearSharedContent: () => void;
   renameFolder: (folderId: string, newName: string) => Promise<boolean>;
   moveNote: (noteId: string, targetFolderId: string | null) => Promise<boolean>;
+  queryNotes: () => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -93,6 +95,32 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       console.error("Error loading data:", error);
     }
   }, []);
+
+  // Add to AppProvider component
+  const queryNotes = useCallback(async () => {
+    const hasKey = await GeminiService.hasApiKey();
+    if (!hasKey) {
+      Alert.alert(
+        "API Key Required",
+        "You need to set up your Gemini API key first. Would you like to do that now?",
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Set Up",
+            onPress: () => {
+              setCurrentScreen("query-notes");
+            },
+          },
+        ]
+      );
+      return;
+    }
+
+    // Navigate to query notes screen
+    setCurrentScreen("query-notes");
+    setCurrentFolderId(null);
+    setCurrentNoteId(null);
+  }, [setCurrentScreen]);
 
   const renameFolder = async (folderId: string, newName: string) => {
     setFolders((prev) =>
@@ -602,6 +630,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     clearSharedContent,
     renameFolder,
     moveNote,
+    queryNotes,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
