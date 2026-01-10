@@ -26,6 +26,8 @@ import {
   AlertTriangle,
   Send,
   CheckCircle,
+  Settings,
+  RefreshCw,
 } from "lucide-react-native";
 import { useApp } from "../context/AppContext";
 import { colors } from "../theme/colors";
@@ -72,6 +74,7 @@ const QueryNotesScreen: React.FC = () => {
   const [isTestingApiKey, setIsTestingApiKey] = useState(false);
   const [showPrivacyWarning, setShowPrivacyWarning] = useState(false);
   const [hasValidApiKey, setHasValidApiKey] = useState(false);
+  const [isChangingApiKey, setIsChangingApiKey] = useState(false);
 
   // Keyboard listeners
   useEffect(() => {
@@ -107,6 +110,19 @@ const QueryNotesScreen: React.FC = () => {
     };
     checkApiKey();
   }, []);
+
+  // Load existing API key when modal opens for change
+  useEffect(() => {
+    const loadApiKey = async () => {
+      if (showApiKeyModal && !isChangingApiKey) {
+        const existingKey = await GeminiService.getApiKey();
+        if (existingKey) {
+          setApiKey("••••••••••••••••"); // Mask existing key
+        }
+      }
+    };
+    loadApiKey();
+  }, [showApiKeyModal, isChangingApiKey]);
 
   const filteredNotes = getFilteredAndSortedItems(
     notes.filter(
@@ -243,6 +259,37 @@ const QueryNotesScreen: React.FC = () => {
     );
   }, [selectionMode]);
 
+  // Handle changing API key
+  const handleChangeApiKey = () => {
+    setIsChangingApiKey(true);
+    setApiKey(""); // Clear the masked key
+    setApiKeyError("");
+    setShowApiKeyModal(true);
+  };
+
+  // Handle remove API key
+  const handleRemoveApiKey = async () => {
+    Alert.alert(
+      "Remove API Key",
+      "Are you sure you want to remove your API key? You'll need to enter it again to use AI features.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Remove",
+          style: "destructive",
+          onPress: async () => {
+            await GeminiService.removeApiKey();
+            setHasValidApiKey(false);
+            setShowApiKeyModal(true);
+            setChatMessages([]);
+            setSelectedNotes([]);
+            setIsChangingApiKey(true);
+          },
+        },
+      ]
+    );
+  };
+
   const handleTestApiKey = async () => {
     if (!apiKey.trim()) {
       setApiKeyError("Please enter your API key");
@@ -259,6 +306,7 @@ const QueryNotesScreen: React.FC = () => {
         await GeminiService.saveApiKey(apiKey);
         setHasValidApiKey(true);
         setShowApiKeyModal(false);
+        setIsChangingApiKey(false);
         Alert.alert("Success", "API key saved successfully!");
         setShowPrivacyWarning(true);
       } else {
@@ -544,6 +592,7 @@ const QueryNotesScreen: React.FC = () => {
         onRequestClose={() => {
           if (hasValidApiKey) {
             setShowApiKeyModal(false);
+            setIsChangingApiKey(false);
           }
         }}
       >
@@ -560,6 +609,7 @@ const QueryNotesScreen: React.FC = () => {
               onPress={() => {
                 if (hasValidApiKey) {
                   setShowApiKeyModal(false);
+                  setIsChangingApiKey(false);
                 } else {
                   setCurrentScreen("notes-list");
                 }
@@ -587,7 +637,7 @@ const QueryNotesScreen: React.FC = () => {
                   marginBottom: 8,
                 }}
               >
-                Gemini API Key
+                {isChangingApiKey ? "Change API Key" : "Gemini API Key"}
               </Text>
               <Text
                 style={{
@@ -598,8 +648,9 @@ const QueryNotesScreen: React.FC = () => {
                   paddingHorizontal: 20,
                 }}
               >
-                Enter your Google Gemini API key to enable AI-powered note
-                queries
+                {isChangingApiKey
+                  ? "Enter a new Gemini API key"
+                  : "Enter your Google Gemini API key to enable AI-powered note queries"}
               </Text>
             </View>
 
@@ -675,16 +726,67 @@ const QueryNotesScreen: React.FC = () => {
                     fontWeight: "700",
                   }}
                 >
-                  Test & Save API Key
+                  {isChangingApiKey ? "Update API Key" : "Test & Save API Key"}
                 </Text>
               )}
             </TouchableOpacity>
+
+            {hasValidApiKey && !isChangingApiKey && (
+              <TouchableOpacity
+                style={{
+                  marginTop: 16,
+                  backgroundColor: colors.backgroundCard,
+                  borderRadius: 10,
+                  padding: 18,
+                  alignItems: "center",
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                }}
+                onPress={handleChangeApiKey}
+              >
+                <Text
+                  style={{
+                    fontSize: 16,
+                    color: colors.text,
+                    fontWeight: "600",
+                  }}
+                >
+                  Change API Key
+                </Text>
+              </TouchableOpacity>
+            )}
+
+            {hasValidApiKey && (
+              <TouchableOpacity
+                style={{
+                  marginTop: 16,
+                  backgroundColor: colors.backgroundCard,
+                  borderRadius: 10,
+                  padding: 18,
+                  alignItems: "center",
+                  borderWidth: 1,
+                  borderColor: colors.error,
+                }}
+                onPress={handleRemoveApiKey}
+              >
+                <Text
+                  style={{
+                    fontSize: 16,
+                    color: colors.error,
+                    fontWeight: "600",
+                  }}
+                >
+                  Remove API Key
+                </Text>
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity
               style={{ marginTop: 20, alignItems: "center", padding: 12 }}
               onPress={() => {
                 if (hasValidApiKey) {
                   setShowApiKeyModal(false);
+                  setIsChangingApiKey(false);
                 } else {
                   setCurrentScreen("notes-list");
                 }
@@ -744,6 +846,16 @@ const QueryNotesScreen: React.FC = () => {
               Thinking made interactive
             </Text>
           </View>
+
+          {/* API Key Settings Button */}
+          {hasValidApiKey && !selectionMode && (
+            <TouchableOpacity
+              onPress={handleChangeApiKey}
+              style={{ padding: 8, marginRight: 8 }}
+            >
+              <Settings size={22} color={colors.textSecondary} />
+            </TouchableOpacity>
+          )}
 
           {/* Selection mode controls */}
           {selectionMode ? (
@@ -814,28 +926,58 @@ const QueryNotesScreen: React.FC = () => {
                   </Text>
                 </TouchableOpacity>
               )}
-              <TouchableOpacity
-                onPress={handleClearAllSelections}
-                style={{
-                  paddingHorizontal: 12,
-                  paddingVertical: 8,
-                  backgroundColor: colors.backgroundCard,
-                  borderRadius: 8,
-                }}
-              >
-                <Text
-                  style={{
-                    color: colors.error,
-                    fontSize: 14,
-                    fontWeight: "600",
-                  }}
-                >
-                  Clear All
-                </Text>
-              </TouchableOpacity>
             </View>
           ) : null}
         </View>
+
+        {/* API Key Status Indicator */}
+        {hasValidApiKey && !selectionMode && selectedNotes.length === 0 && (
+          <View
+            style={{
+              backgroundColor: colors.success + "10",
+              paddingVertical: 8,
+              paddingHorizontal: 20,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.border,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <CheckCircle
+                size={16}
+                color={colors.success}
+                style={{ marginRight: 8 }}
+              />
+              <Text
+                style={{
+                  color: colors.success,
+                  fontSize: 13,
+                  fontWeight: "600",
+                }}
+              >
+                API Key Configured
+              </Text>
+            </View>
+            <TouchableOpacity
+              onPress={handleChangeApiKey}
+              style={{ flexDirection: "row", alignItems: "center" }}
+            >
+              <Text
+                style={{
+                  color: colors.primary,
+                  fontSize: 13,
+                  fontWeight: "600",
+                  marginRight: 4,
+                }}
+              >
+                Change
+              </Text>
+              <RefreshCw size={14} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Selection mode indicator */}
         {selectionMode && (
