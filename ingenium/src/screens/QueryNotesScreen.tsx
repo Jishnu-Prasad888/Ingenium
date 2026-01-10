@@ -25,6 +25,7 @@ import {
   Key,
   AlertTriangle,
   Send,
+  CheckCircle,
 } from "lucide-react-native";
 import { useApp } from "../context/AppContext";
 import { colors } from "../theme/colors";
@@ -39,20 +40,30 @@ interface ChatMessage {
   timestamp: number;
 }
 
+interface SelectedNote {
+  id: string;
+  title: string;
+  content: string;
+}
+
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 const QueryNotesScreen: React.FC = () => {
   const { notes, setCurrentScreen, getFilteredAndSortedItems } = useApp();
 
-  const [selectedNotes, setSelectedNotes] = useState<
-    Array<{ id: string; title: string; content: string }>
-  >([]);
+  const [selectedNotes, setSelectedNotes] = useState<SelectedNote[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [question, setQuestion] = useState("");
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  // Multi-selection mode states
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [tempSelectedNotes, setTempSelectedNotes] = useState<SelectedNote[]>(
+    []
+  );
 
   // API Key states
   const [showApiKeyModal, setShowApiKeyModal] = useState(false);
@@ -104,27 +115,133 @@ const QueryNotesScreen: React.FC = () => {
     "note"
   );
 
-  const handleSelectNote = (note: any) => {
-    if (selectedNotes.length >= 10) {
-      Alert.alert(
-        "Limit Reached",
-        "You can only select up to 10 notes at a time."
-      );
+  // Enter multi-selection mode on long press
+  const handleLongPressNote = useCallback((note: any) => {
+    setSelectionMode(true);
+    // Initialize temp selection with this note
+    const newNote: SelectedNote = {
+      id: note.id,
+      title: note.title,
+      content: note.content,
+    };
+    setTempSelectedNotes([newNote]);
+  }, []);
+
+  // Handle note press - different behavior based on mode
+  const handleNotePress = useCallback(
+    (note: any) => {
+      if (selectionMode) {
+        // In selection mode: toggle note selection
+        const noteToAdd: SelectedNote = {
+          id: note.id,
+          title: note.title,
+          content: note.content,
+        };
+
+        const isAlreadySelected = tempSelectedNotes.some(
+          (selected) => selected.id === note.id
+        );
+
+        if (isAlreadySelected) {
+          // Remove from selection
+          setTempSelectedNotes(
+            tempSelectedNotes.filter((selected) => selected.id !== note.id)
+          );
+        } else {
+          // Add to selection if under limit
+          if (tempSelectedNotes.length < 10) {
+            setTempSelectedNotes([...tempSelectedNotes, noteToAdd]);
+          } else {
+            Alert.alert(
+              "Limit Reached",
+              "You can only select up to 10 notes at a time."
+            );
+          }
+        }
+      } else {
+        // Normal mode: single note selection
+        if (selectedNotes.length >= 10) {
+          Alert.alert(
+            "Limit Reached",
+            "You can only select up to 10 notes at a time."
+          );
+          return;
+        }
+
+        const newNote: SelectedNote = {
+          id: note.id,
+          title: note.title,
+          content: note.content,
+        };
+
+        // Check if already selected in main list
+        const isAlreadySelected = selectedNotes.some(
+          (selected) => selected.id === note.id
+        );
+
+        if (!isAlreadySelected) {
+          setSelectedNotes([...selectedNotes, newNote]);
+        }
+      }
+    },
+    [selectionMode, tempSelectedNotes, selectedNotes]
+  );
+
+  // Confirm selections and exit selection mode
+  const handleConfirmSelections = useCallback(() => {
+    if (tempSelectedNotes.length === 0) {
+      Alert.alert("No Selection", "Please select at least one note.");
       return;
     }
-    setSelectedNotes([
-      ...selectedNotes,
-      {
-        id: note.id,
-        title: note.title,
-        content: note.content,
-      },
-    ]);
-  };
+
+    // Add temp selections to main selected notes
+    const newSelections = [...selectedNotes];
+
+    // Only add notes that aren't already selected
+    tempSelectedNotes.forEach((tempNote) => {
+      if (!newSelections.some((selected) => selected.id === tempNote.id)) {
+        if (newSelections.length < 10) {
+          newSelections.push(tempNote);
+        }
+      }
+    });
+
+    setSelectedNotes(newSelections);
+    setSelectionMode(false);
+    setTempSelectedNotes([]);
+  }, [tempSelectedNotes, selectedNotes]);
+
+  // Cancel selection mode
+  const handleCancelSelection = useCallback(() => {
+    setSelectionMode(false);
+    setTempSelectedNotes([]);
+  }, []);
 
   const handleRemoveNote = (noteId: string) => {
     setSelectedNotes(selectedNotes.filter((note) => note.id !== noteId));
   };
+
+  // Clear all selected notes
+  const handleClearAllSelections = useCallback(() => {
+    Alert.alert(
+      "Clear All Selections",
+      "Are you sure you want to remove all selected notes?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Clear All",
+          style: "destructive",
+          onPress: () => {
+            setSelectedNotes([]);
+            if (selectionMode) {
+              setSelectionMode(false);
+              setTempSelectedNotes([]);
+            }
+          },
+        },
+      ]
+    );
+  }, [selectionMode]);
 
   const handleTestApiKey = async () => {
     if (!apiKey.trim()) {
@@ -179,9 +296,12 @@ const QueryNotesScreen: React.FC = () => {
     setIsLoading(true);
 
     try {
+      // Ensure we're passing the correct context (max 10 notes)
+      const notesToSend = selectedNotes.slice(0, 10);
+
       const result = await GeminiService.queryWithNotes(
         currentQuestion,
-        selectedNotes
+        notesToSend
       );
 
       const assistantMessage: ChatMessage = {
@@ -221,6 +341,18 @@ const QueryNotesScreen: React.FC = () => {
       },
     ]);
   };
+
+  // Check if a note is selected (either in selection mode or normal mode)
+  const isNoteSelected = useCallback(
+    (noteId: string) => {
+      if (selectionMode) {
+        return tempSelectedNotes.some((note) => note.id === noteId);
+      } else {
+        return selectedNotes.some((note) => note.id === noteId);
+      }
+    },
+    [selectionMode, tempSelectedNotes, selectedNotes]
+  );
 
   if (!hasValidApiKey && !showApiKeyModal) {
     return (
@@ -590,39 +722,156 @@ const QueryNotesScreen: React.FC = () => {
           >
             <ChevronLeft size={28} color={colors.text} />
           </TouchableOpacity>
-          <Text
-            style={{
-              fontSize: 24,
-              color: colors.text,
-              fontWeight: "700",
-              marginLeft: 12,
-              flex: 1,
-            }}
-          >
-            Query Notes
-          </Text>
-          {chatMessages.length > 0 && (
-            <TouchableOpacity
-              onPress={handleClearChat}
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <Text
               style={{
-                paddingHorizontal: 12,
-                paddingVertical: 8,
-                backgroundColor: colors.backgroundCard,
-                borderRadius: 8,
+                fontSize: 24,
+                color: colors.text,
+                fontWeight: "500",
+                lineHeight: 28,
               }}
             >
-              <Text
+              Aivya
+            </Text>
+            <Text
+              style={{
+                fontSize: 13,
+                color: colors.textSecondary,
+                marginTop: 2,
+                fontWeight: "500",
+              }}
+            >
+              Thinking made interactive
+            </Text>
+          </View>
+
+          {/* Selection mode controls */}
+          {selectionMode ? (
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
+            >
+              <TouchableOpacity
+                onPress={handleCancelSelection}
                 style={{
-                  color: colors.textSecondary,
-                  fontSize: 14,
-                  fontWeight: "600",
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  backgroundColor: colors.backgroundCard,
+                  borderRadius: 8,
                 }}
               >
-                Clear
-              </Text>
-            </TouchableOpacity>
-          )}
+                <Text
+                  style={{
+                    color: colors.textSecondary,
+                    fontSize: 14,
+                    fontWeight: "600",
+                  }}
+                >
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleConfirmSelections}
+                style={{
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  backgroundColor: colors.primary,
+                  borderRadius: 8,
+                }}
+              >
+                <Text
+                  style={{
+                    color: colors.white,
+                    fontSize: 14,
+                    fontWeight: "600",
+                  }}
+                >
+                  Done ({tempSelectedNotes.length}/10)
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : selectedNotes.length > 0 ? (
+            <View
+              style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
+            >
+              {chatMessages.length > 0 && (
+                <TouchableOpacity
+                  onPress={handleClearChat}
+                  style={{
+                    paddingHorizontal: 12,
+                    paddingVertical: 8,
+                    backgroundColor: colors.backgroundCard,
+                    borderRadius: 8,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: colors.textSecondary,
+                      fontSize: 14,
+                      fontWeight: "600",
+                    }}
+                  >
+                    Clear Chat
+                  </Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                onPress={handleClearAllSelections}
+                style={{
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  backgroundColor: colors.backgroundCard,
+                  borderRadius: 8,
+                }}
+              >
+                <Text
+                  style={{
+                    color: colors.error,
+                    fontSize: 14,
+                    fontWeight: "600",
+                  }}
+                >
+                  Clear All
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : null}
         </View>
+
+        {/* Selection mode indicator */}
+        {selectionMode && (
+          <View
+            style={{
+              backgroundColor: colors.primary + "10",
+              paddingVertical: 10,
+              paddingHorizontal: 20,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.border,
+            }}
+          >
+            <Text
+              style={{
+                color: colors.primary,
+                fontSize: 14,
+                fontWeight: "600",
+                textAlign: "center",
+              }}
+            >
+              Selection Mode - Tap notes to select
+            </Text>
+            <Text
+              style={{
+                color: colors.textSecondary,
+                fontSize: 12,
+                textAlign: "center",
+                marginTop: 2,
+              }}
+            >
+              {tempSelectedNotes.length} note
+              {tempSelectedNotes.length !== 1 ? "s" : ""} selected • Max 10
+              notes
+            </Text>
+          </View>
+        )}
 
         {/* Selected Notes Pills */}
         {selectedNotes.length > 0 && (
@@ -674,7 +923,7 @@ const QueryNotesScreen: React.FC = () => {
           </View>
         )}
 
-        {/* Main Content Area - This will shrink when keyboard is visible */}
+        {/* Main Content Area */}
         <View style={{ flex: 1 }}>
           {selectedNotes.length === 0 ? (
             // Notes Selection Area
@@ -711,6 +960,18 @@ const QueryNotesScreen: React.FC = () => {
                     </TouchableOpacity>
                   )}
                 </View>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: colors.textSecondary,
+                    marginTop: 8,
+                    textAlign: "center",
+                  }}
+                >
+                  {selectionMode
+                    ? "Tap notes to select • Done when finished"
+                    : "Tap to select one note • Long press for multiple selection"}
+                </Text>
               </View>
 
               <ScrollView
@@ -728,58 +989,85 @@ const QueryNotesScreen: React.FC = () => {
                         .toLowerCase()
                         .includes(searchQuery.toLowerCase())
                   )
-                  .map((note: any) => (
-                    <TouchableOpacity
-                      key={note.id}
-                      style={{
-                        backgroundColor: colors.backgroundCard,
-                        borderRadius: 12,
-                        padding: 16,
-                        marginBottom: 12,
-                        borderWidth: 1,
-                        borderColor: colors.border,
-                      }}
-                      onPress={() => handleSelectNote(note)}
-                      activeOpacity={0.7}
-                    >
-                      <View
+                  .map((note: any) => {
+                    const selected = isNoteSelected(note.id);
+
+                    return (
+                      <TouchableOpacity
+                        key={note.id}
                         style={{
-                          flexDirection: "row",
-                          justifyContent: "space-between",
-                          alignItems: "flex-start",
+                          backgroundColor: colors.backgroundCard,
+                          borderRadius: 12,
+                          padding: 16,
+                          marginBottom: 12,
+                          borderWidth: selected ? 2 : 1,
+                          borderColor: selected
+                            ? colors.primary
+                            : colors.border,
+                          position: "relative",
                         }}
+                        onPress={() => handleNotePress(note)}
+                        onLongPress={() => handleLongPressNote(note)}
+                        activeOpacity={0.7}
+                        delayLongPress={500}
                       >
-                        <View style={{ flex: 1, marginRight: 12 }}>
-                          <Text
+                        {selected && (
+                          <View
                             style={{
-                              fontSize: 16,
-                              color: colors.text,
-                              fontWeight: "600",
-                              marginBottom: 6,
+                              position: "absolute",
+                              top: -8,
+                              right: -8,
+                              backgroundColor: colors.primary,
+                              borderRadius: 12,
+                              width: 24,
+                              height: 24,
+                              justifyContent: "center",
+                              alignItems: "center",
+                              zIndex: 1,
                             }}
                           >
-                            {note.title}
-                          </Text>
-                          <Text
-                            style={{
-                              fontSize: 14,
-                              color: colors.textSecondary,
-                              lineHeight: 20,
-                            }}
-                            numberOfLines={2}
-                          >
-                            {note.content.substring(0, 120)}
-                            {note.content.length > 120 ? "..." : ""}
-                          </Text>
+                            <CheckCircle size={16} color={colors.white} />
+                          </View>
+                        )}
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            justifyContent: "space-between",
+                            alignItems: "flex-start",
+                          }}
+                        >
+                          <View style={{ flex: 1, marginRight: 12 }}>
+                            <Text
+                              style={{
+                                fontSize: 16,
+                                color: colors.text,
+                                fontWeight: "600",
+                                marginBottom: 6,
+                              }}
+                            >
+                              {note.title}
+                            </Text>
+                            <Text
+                              style={{
+                                fontSize: 14,
+                                color: colors.textSecondary,
+                                lineHeight: 20,
+                              }}
+                              numberOfLines={2}
+                            >
+                              {note.content.substring(0, 120)}
+                              {note.content.length > 120 ? "..." : ""}
+                            </Text>
+                          </View>
+                          <MessageSquare size={22} color={colors.primary} />
                         </View>
-                        <MessageSquare size={22} color={colors.primary} />
-                      </View>
-                    </TouchableOpacity>
-                  ))}
+                      </TouchableOpacity>
+                    );
+                  })}
               </ScrollView>
             </View>
           ) : (
-            // Chat Area with flexible height
+            // Chat Area
             <View
               style={{
                 flex: 1,
@@ -836,9 +1124,37 @@ const QueryNotesScreen: React.FC = () => {
                         lineHeight: 20,
                       }}
                     >
-                      Ask a question about your selected notes to get AI-powered
-                      insights
+                      Ask a question about your {selectedNotes.length} selected
+                      note{selectedNotes.length !== 1 ? "s" : ""} to get
+                      AI-powered insights
                     </Text>
+                    <TouchableOpacity
+                      style={{
+                        marginTop: 20,
+                        paddingHorizontal: 16,
+                        paddingVertical: 10,
+                        backgroundColor: colors.backgroundAlt,
+                        borderRadius: 8,
+                        flexDirection: "row",
+                        alignItems: "center",
+                      }}
+                      onPress={() => setSelectionMode(true)}
+                    >
+                      <MessageSquare
+                        size={16}
+                        color={colors.primary}
+                        style={{ marginRight: 8 }}
+                      />
+                      <Text
+                        style={{
+                          color: colors.primary,
+                          fontSize: 14,
+                          fontWeight: "500",
+                        }}
+                      >
+                        Select More Notes
+                      </Text>
+                    </TouchableOpacity>
                   </View>
                 ) : (
                   <ScrollView
@@ -959,8 +1275,8 @@ const QueryNotesScreen: React.FC = () => {
           )}
         </View>
 
-        {/* Question Input - Always visible at bottom */}
-        {selectedNotes.length > 0 && (
+        {/* Question Input - Only show when notes are selected and not in selection mode */}
+        {selectedNotes.length > 0 && !selectionMode && (
           <View
             style={{
               paddingHorizontal: 16,
@@ -1001,7 +1317,7 @@ const QueryNotesScreen: React.FC = () => {
                     fontSize: 16,
                     color: colors.text,
                     paddingVertical: 0,
-                    maxHeight: 90, // grows only after 1 line
+                    maxHeight: 90,
                   }}
                 />
               </View>
@@ -1034,6 +1350,17 @@ const QueryNotesScreen: React.FC = () => {
                 )}
               </TouchableOpacity>
             </View>
+            <Text
+              style={{
+                fontSize: 12,
+                color: colors.textSecondary,
+                textAlign: "center",
+                marginTop: 4,
+              }}
+            >
+              Using {selectedNotes.length} note
+              {selectedNotes.length !== 1 ? "s" : ""} as context
+            </Text>
           </View>
         )}
       </KeyboardAvoidingView>
