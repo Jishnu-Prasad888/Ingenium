@@ -11,7 +11,7 @@ import SyncIndicator from "./SyncIndicator";
 import DebugDatabaseInfo from "./DebugDatabaseInfo";
 import { colors } from "../theme/colors";
 import DeepLinkHandler from "./DeepLinkHandler";
-
+import QueryNotesScreen from "../screens/QueryNotesScreen";
 export const AppContent: React.FC = () => {
   const { currentScreen, isSharing, sharedContent, clearSharedContent } =
     useApp();
@@ -32,6 +32,7 @@ export const AppContent: React.FC = () => {
           {currentScreen === "notes-list" && <NotesListScreen />}
           {currentScreen === "folder-explorer" && <FolderExplorerScreen />}
           {currentScreen === "note-editor" && <NoteEditorScreen />}
+          {currentScreen === "query-notes" && <QueryNotesScreen />}
 
           <BottomNavigationBar />
           <SyncIndicator />
