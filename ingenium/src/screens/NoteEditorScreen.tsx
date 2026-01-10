@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  Keyboard,
 } from "react-native";
 import { ChevronLeft, Share2, Save, Trash2 } from "lucide-react-native";
 import { useApp } from "../context/AppContext";
@@ -234,6 +235,22 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
 
 const NoteEditorScreen: React.FC = () => {
   const { width } = useWindowDimensions();
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [bottomBarHeight, setBottomBarHeight] = useState(0);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener("keyboardDidShow", () =>
+      setKeyboardVisible(true)
+    );
+    const hideSub = Keyboard.addListener("keyboardDidHide", () =>
+      setKeyboardVisible(false)
+    );
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
   const showButtonText = width >= 420;
   const {
     notes,
@@ -284,7 +301,7 @@ const NoteEditorScreen: React.FC = () => {
         borderColor: colors.textSecondary,
         alignItems: "center",
         justifyContent: "center",
-        minWidth: 42,
+        minWidth: 30,
       }}
     >
       {typeof label === "string" ? (
@@ -457,7 +474,11 @@ const NoteEditorScreen: React.FC = () => {
 
   return (
     <SafeAreaView
-      style={{ flex: 1, backgroundColor: colors.background, paddingTop: 20 }}
+      style={{
+        flex: 1,
+        backgroundColor: colors.background,
+        paddingTop: 20,
+      }}
     >
       {/* Delete Confirmation Popup */}
       <DeleteConfirmationPopup
@@ -496,9 +517,11 @@ const NoteEditorScreen: React.FC = () => {
 
       {/* KeyboardAvoidingView wraps the main content area */}
       <KeyboardAvoidingView
-        style={{ flex: 1 }}
+        style={{
+          flex: 1,
+        }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 0}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 60}
       >
         <View style={{ flex: 1, paddingHorizontal: 20, marginBottom: 10 }}>
           <View
@@ -506,7 +529,7 @@ const NoteEditorScreen: React.FC = () => {
               flex: 1,
               backgroundColor: colors.backgroundCard,
               borderRadius: 12,
-              padding: 20,
+              padding: 10,
             }}
           >
             {/* Title */}
@@ -617,74 +640,142 @@ const NoteEditorScreen: React.FC = () => {
                   </ScrollView>
                 )}
               </View>
-            </View>
 
-            {/* Keyboard-aware toolbar */}
-            <View
-              style={{
-                backgroundColor: colors.backgroundAlt,
-                borderTopWidth: 1,
-                borderTopColor: colors.textSecondary,
-                paddingVertical: 4,
-              }}
-            >
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                contentContainerStyle={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 8,
-                  paddingHorizontal: 10,
-                  borderRadius: 30,
-                }}
-              >
-                <FormatButton
-                  label={isPreview ? "Edit" : "Preview"}
-                  onPress={() => setIsPreview((p) => !p)}
-                />
-                <FormatButton
-                  label={<ExternalLink size={16} color={colors.text} />}
-                  onPress={() => setIsFullscreen(true)}
-                />
-                <FormatButton label="H1" onPress={() => insertMarkdown("# ")} />
-                <FormatButton
-                  label="H2"
-                  onPress={() => insertMarkdown("## ")}
-                />
-                <FormatButton
-                  label="H3"
-                  onPress={() => insertMarkdown("### ")}
-                />
-                <FormatButton
-                  label="B"
-                  onPress={() => insertMarkdown("**", "**")}
-                />
-                <FormatButton
-                  label="I"
-                  onPress={() => insertMarkdown("*", "*")}
-                />
-                <FormatButton
-                  label="U"
-                  onPress={() => insertMarkdown("__", "__")}
-                />
-                <FormatButton
-                  label="☐"
-                  onPress={() => insertMarkdown("- [ ] ")}
-                />
-              </ScrollView>
+              {!keyboardVisible && (
+                <SafeAreaView>
+                  <View
+                    style={{
+                      backgroundColor: colors.backgroundCard,
+                      borderTopWidth: 1,
+                      borderTopColor: colors.border,
+                      paddingVertical: 8,
+                    }}
+                  >
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{
+                        paddingHorizontal: 12,
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <FormatButton
+                        label={isPreview ? "Edit" : "Preview"}
+                        onPress={() => setIsPreview((p) => !p)}
+                      />
+                      <FormatButton
+                        label={<ExternalLink size={16} color={colors.text} />}
+                        onPress={() => setIsFullscreen(true)}
+                      />
+                      <FormatButton
+                        label="H1"
+                        onPress={() => insertMarkdown("# ")}
+                      />
+                      <FormatButton
+                        label="H2"
+                        onPress={() => insertMarkdown("## ")}
+                      />
+                      <FormatButton
+                        label="H3"
+                        onPress={() => insertMarkdown("### ")}
+                      />
+                      <FormatButton
+                        label="B"
+                        onPress={() => insertMarkdown("**", "**")}
+                      />
+                      <FormatButton
+                        label="I"
+                        onPress={() => insertMarkdown("*", "*")}
+                      />
+                      <FormatButton
+                        label="U"
+                        onPress={() => insertMarkdown("__", "__")}
+                      />
+                      <FormatButton
+                        label="☐"
+                        onPress={() => insertMarkdown("- [ ] ")}
+                      />
+                    </ScrollView>
+                  </View>
+                </SafeAreaView>
+              )}
             </View>
           </View>
         </View>
       </KeyboardAvoidingView>
 
+      {keyboardVisible && (
+        <SafeAreaView
+          style={{
+            marginHorizontal: 20,
+            borderRadius: 20,
+            marginTop: -6,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: colors.backgroundCard,
+              borderTopWidth: 1,
+              borderTopColor: colors.border,
+              paddingVertical: 4,
+              borderRadius: 6,
+              borderColor: colors.border,
+              borderWidth: 1,
+            }}
+          >
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{
+                paddingHorizontal: 12,
+                alignItems: "center",
+                gap: 8,
+              }}
+              keyboardShouldPersistTaps="always"
+            >
+              <FormatButton
+                label={isPreview ? "Edit" : "Preview"}
+                onPress={() => setIsPreview((p) => !p)}
+              />
+              <FormatButton
+                label={<ExternalLink size={16} color={colors.text} />}
+                onPress={() => setIsFullscreen(true)}
+              />
+              <FormatButton label="H1" onPress={() => insertMarkdown("# ")} />
+              <FormatButton label="H2" onPress={() => insertMarkdown("## ")} />
+              <FormatButton label="H3" onPress={() => insertMarkdown("### ")} />
+              <FormatButton
+                label="B"
+                onPress={() => insertMarkdown("**", "**")}
+              />
+              <FormatButton
+                label="I"
+                onPress={() => insertMarkdown("*", "*")}
+              />
+              <FormatButton
+                label="U"
+                onPress={() => insertMarkdown("__", "__")}
+              />
+              <FormatButton
+                label="☐"
+                onPress={() => insertMarkdown("- [ ] ")}
+              />
+            </ScrollView>
+          </View>
+        </SafeAreaView>
+      )}
+
       {/* Bottom action buttons - outside KeyboardAvoidingView */}
       <View
         style={{
+          position: "absolute",
+          left: 0,
+          right: 0,
+          bottom: 0,
           paddingHorizontal: 20,
-          paddingBottom: Platform.OS === "ios" ? 50 : 50,
           paddingTop: 8,
+          paddingBottom: 90, // ← always 90, no conditions
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "center",
@@ -692,6 +783,7 @@ const NoteEditorScreen: React.FC = () => {
           backgroundColor: colors.background,
           borderTopWidth: 1,
           borderTopColor: colors.border,
+          zIndex: 10,
         }}
       >
         {/* Back Button */}
