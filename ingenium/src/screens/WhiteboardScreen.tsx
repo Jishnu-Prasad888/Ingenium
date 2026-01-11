@@ -9,6 +9,7 @@ import {
   Dimensions,
   Modal,
   Pressable,
+  Animated,
 } from "react-native";
 import { Canvas, Path, Skia, useCanvasRef } from "@shopify/react-native-skia";
 import {
@@ -28,7 +29,8 @@ import { colors } from "../theme/colors";
 import Header from "../components/Header";
 import { useApp } from "../context/AppContext";
 import { SafeAreaView } from "react-native-safe-area-context";
-
+import Slider from "@react-native-community/slider";
+import * as Haptics from "expo-haptics";
 type DrawingTool = "pen" | "pencil" | "eraser";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -48,10 +50,12 @@ const WhiteboardScreen: React.FC = () => {
   const [paths, setPaths] = useState<DrawingPath[]>([]);
   const [currentPath, setCurrentPath] = useState<DrawingPath | null>(null);
   const [currentColor, setCurrentColor] = useState<string>("#000000");
-  const [currentStrokeWidth] = useState<number>(3);
   const [currentTool, setCurrentTool] = useState<DrawingTool>("pen");
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [strokeWidth, setStrokeWidth] = useState(3);
+  const [showStrokeSlider, setShowStrokeSlider] = useState(false);
+  const [drawingEnabled, setDrawingEnabled] = useState(true);
 
   const colorsPalette = [
     "#000000",
@@ -66,25 +70,75 @@ const WhiteboardScreen: React.FC = () => {
     "#8E8E93",
   ];
 
+  const StrokeSlider: React.FC<{
+    strokeWidth: number;
+    setStrokeWidth: (value: number) => void;
+    visible: boolean; // new prop
+  }> = ({ strokeWidth, setStrokeWidth, visible }) => {
+    const lastStepRef = useRef(strokeWidth);
+    const anim = useRef(new Animated.Value(0)).current;
+
+    // Animate expand/collapse based on prop
+    React.useEffect(() => {
+      Animated.timing(anim, {
+        toValue: visible ? 1 : 0,
+        duration: 200,
+        useNativeDriver: false,
+      }).start();
+    }, [visible]);
+
+    const containerHeight = anim.interpolate({
+      inputRange: [0, 1],
+      outputRange: [60, 180], // collapsed vs expanded
+    });
+
+    return (
+      <Animated.View
+        style={[styles.sliderContainer, { height: containerHeight }]}
+      >
+        <View style={styles.sizeCircleContainer}>
+          <Text style={styles.strokeValue}>{strokeWidth}</Text>
+        </View>
+
+        <Slider
+          style={styles.verticalSlider}
+          minimumValue={1}
+          maximumValue={12}
+          step={1}
+          value={strokeWidth}
+          onValueChange={(value) => {
+            setStrokeWidth(value);
+            if (lastStepRef.current !== value) {
+              Haptics.selectionAsync();
+              lastStepRef.current = value;
+            }
+          }}
+          minimumTrackTintColor="#007AFF"
+          maximumTrackTintColor="#ccc"
+          thumbTintColor="#007AFF"
+        />
+      </Animated.View>
+    );
+  };
+
   // Helper functions that run on JS thread
   const startPath = (x: number, y: number) => {
-    const strokeWidth =
+    const width =
       currentTool === "pencil"
-        ? 1
+        ? Math.max(1, strokeWidth - 2)
         : currentTool === "eraser"
         ? 20
-        : currentStrokeWidth;
+        : strokeWidth;
+
     const color = currentTool === "eraser" ? "#FFFFFF" : currentColor;
     const blendMode = currentTool === "eraser" ? "clear" : undefined;
 
-    // Create a new path starting at the touch point
     const newPath: DrawingPath = {
       segments: [`M ${x} ${y}`],
       color,
-      strokeWidth,
+      strokeWidth: width,
       blendMode,
     };
-
     setCurrentPath(newPath);
   };
 
@@ -112,6 +166,7 @@ const WhiteboardScreen: React.FC = () => {
 
   // Create pan gesture handler
   const panGesture = Gesture.Pan()
+    .enabled(drawingEnabled)
     .onStart((event) => {
       const { x, y } = event;
       runOnJS(startPath)(x, y);
@@ -123,7 +178,7 @@ const WhiteboardScreen: React.FC = () => {
     .onEnd(() => {
       runOnJS(endPath)();
     })
-    .minDistance(1); // Minimum distance before gesture is recognized
+    .minDistance(1);
 
   const handleBackPress = () => {
     setCurrentScreen("notes-list");
@@ -324,7 +379,10 @@ const WhiteboardScreen: React.FC = () => {
               styles.toolButton,
               currentTool === "pen" && styles.activeTool,
             ]}
-            onPress={() => setCurrentTool("pen")}
+            onPress={() => {
+              setCurrentTool("pen");
+              setShowStrokeSlider(true);
+            }}
           >
             <Pen
               size={24}
@@ -337,7 +395,10 @@ const WhiteboardScreen: React.FC = () => {
               styles.toolButton,
               currentTool === "pencil" && styles.activeTool,
             ]}
-            onPress={() => setCurrentTool("pencil")}
+            onPress={() => {
+              setCurrentTool("pencil");
+              setShowStrokeSlider(true);
+            }}
           >
             <Pencil
               size={24}
@@ -350,7 +411,11 @@ const WhiteboardScreen: React.FC = () => {
               styles.toolButton,
               currentTool === "eraser" && styles.activeTool,
             ]}
-            onPress={() => setCurrentTool("eraser")}
+            onPress={() => {
+              setCurrentTool("eraser");
+              setShowStrokeSlider(false);
+              setDrawingEnabled(true);
+            }}
           >
             <Eraser
               size={24}
@@ -400,16 +465,47 @@ const WhiteboardScreen: React.FC = () => {
           </View>
         )}
 
-        <View style={styles.canvasContainer}>
-          <View ref={viewRef} style={styles.canvasWrapper} collapsable={false}>
-            <GestureDetector gesture={panGesture}>
-              <Canvas style={styles.canvas} ref={canvasRef}>
-                {renderPaths()}
-                {renderCurrentPath()}
-              </Canvas>
-            </GestureDetector>
+        <Pressable
+          style={{ flex: 1 }}
+          onPress={() => {
+            if (showStrokeSlider) setShowStrokeSlider(false);
+            if (showColorPicker) setShowColorPicker(false);
+          }}
+        >
+          <View style={styles.canvasContainer}>
+            <View
+              ref={viewRef}
+              style={styles.canvasWrapper}
+              collapsable={false}
+            >
+              {drawingEnabled ? (
+                <GestureDetector gesture={panGesture}>
+                  <Canvas style={styles.canvas} ref={canvasRef}>
+                    {renderPaths()}
+                    {renderCurrentPath()}
+                  </Canvas>
+                </GestureDetector>
+              ) : (
+                <Canvas style={styles.canvas} ref={canvasRef}>
+                  {renderPaths()}
+                  {renderCurrentPath()}
+                </Canvas>
+              )}
+            </View>
           </View>
-        </View>
+          {showStrokeSlider && currentTool !== "eraser" && (
+            <Pressable
+              onPress={(e) => e.stopPropagation()} // prevent closing when tapping slider itself
+              style={{ position: "absolute", zIndex: 999 }}
+            >
+              <StrokeSlider
+                strokeWidth={strokeWidth}
+                setStrokeWidth={setStrokeWidth}
+                visible={showStrokeSlider}
+              />
+            </Pressable>
+          )}
+        </Pressable>
       </View>
 
       <Modal
@@ -569,6 +665,56 @@ const styles = StyleSheet.create({
   },
   canvas: {
     flex: 1,
+  },
+  strokeSliderContainer: {
+    position: "absolute",
+    top: 120,
+    left: 12,
+    width: 40,
+    height: 180,
+    backgroundColor: colors.backgroundCard,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 2000,
+    elevation: 6,
+  },
+  sliderContainer: {
+    position: "absolute",
+    top: 120,
+    left: 12,
+    width: 60,
+    height: 180,
+    backgroundColor: "#f0f0f0",
+    borderRadius: 30,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 999, // higher than overlay
+    elevation: 10,
+    paddingVertical: 10,
+  },
+  verticalSlider: {
+    width: 120, // match max container height
+    height: 40, // small horizontal "thickness"
+    transform: [{ rotate: "-90deg" }],
+  },
+  strokePreview: {
+    backgroundColor: "#000",
+  },
+  strokeValue: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 14,
+  },
+  sizeCircleContainer: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "#007AFF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 8, // spacing between circle and preview
+    zIndex: 2,
   },
 });
 
