@@ -9,7 +9,7 @@ import {
   Dimensions,
   Modal,
   Pressable,
-  Animated,
+  PanResponder,
 } from "react-native";
 import { Canvas, Path, Skia, useCanvasRef } from "@shopify/react-native-skia";
 import {
@@ -20,6 +20,7 @@ import {
   Download,
   Trash2,
   Share,
+  Highlighter,
 } from "lucide-react-native";
 import * as MediaLibrary from "expo-media-library";
 import { runOnJS } from "react-native-reanimated";
@@ -29,17 +30,17 @@ import { colors } from "../theme/colors";
 import Header from "../components/Header";
 import { useApp } from "../context/AppContext";
 import { SafeAreaView } from "react-native-safe-area-context";
-import Slider from "@react-native-community/slider";
-import * as Haptics from "expo-haptics";
-type DrawingTool = "pen" | "pencil" | "eraser";
+
+type DrawingTool = "pen" | "pencil" | "eraser" | "highlight";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 interface DrawingPath {
-  segments: string[]; // SVG path commands like ["M 100 100", "L 110 110", ...]
+  segments: string[];
   color: string;
   strokeWidth: number;
   blendMode?: "clear";
+  opacity?: number;
 }
 
 const WhiteboardScreen: React.FC = () => {
@@ -56,6 +57,8 @@ const WhiteboardScreen: React.FC = () => {
   const [strokeWidth, setStrokeWidth] = useState(3);
   const [showStrokeSlider, setShowStrokeSlider] = useState(false);
   const [drawingEnabled, setDrawingEnabled] = useState(true);
+  const [highlightColor, setHighlightColor] = useState("#FFFF00");
+  const highlightOpacity = 0.3;
 
   const colorsPalette = [
     "#000000",
@@ -70,74 +73,115 @@ const WhiteboardScreen: React.FC = () => {
     "#8E8E93",
   ];
 
+  // Simple Touch-Based Vertical Slider Component
   const StrokeSlider: React.FC<{
     strokeWidth: number;
     setStrokeWidth: (value: number) => void;
-    visible: boolean; // new prop
+    visible: boolean;
   }> = ({ strokeWidth, setStrokeWidth, visible }) => {
-    const lastStepRef = useRef(strokeWidth);
-    const anim = useRef(new Animated.Value(0)).current;
+    const sliderHeight = 160;
+    const minSize = 1;
+    const maxSize = 12;
 
-    // Animate expand/collapse based on prop
-    React.useEffect(() => {
-      Animated.timing(anim, {
-        toValue: visible ? 1 : 0,
-        duration: 200,
-        useNativeDriver: false,
-      }).start();
-    }, [visible]);
+    if (!visible) return null;
 
-    const containerHeight = anim.interpolate({
-      inputRange: [0, 1],
-      outputRange: [60, 180], // collapsed vs expanded
-    });
+    const panResponder = useRef(
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: (evt, gestureState) => {
+          const { locationY } = evt.nativeEvent;
+          updateSliderValue(locationY);
+        },
+        onPanResponderMove: (evt, gestureState) => {
+          const { locationY } = evt.nativeEvent;
+          updateSliderValue(locationY);
+        },
+      })
+    ).current;
+
+    const updateSliderValue = (y: number) => {
+      const ratio = Math.max(0, Math.min(1, y / sliderHeight));
+      const value = minSize + (maxSize - minSize) * ratio;
+      setStrokeWidth(Math.round(value));
+    };
+
+    const thumbPosition =
+      ((strokeWidth - minSize) / (maxSize - minSize)) * sliderHeight;
 
     return (
-      <Animated.View
-        style={[styles.sliderContainer, { height: containerHeight }]}
-      >
+      <View style={styles.sliderContainer}>
+        {/* Display current size */}
         <View style={styles.sizeCircleContainer}>
           <Text style={styles.strokeValue}>{strokeWidth}</Text>
         </View>
 
-        <Slider
-          style={styles.verticalSlider}
-          minimumValue={1}
-          maximumValue={12}
-          step={1}
-          value={strokeWidth}
-          onValueChange={(value) => {
-            setStrokeWidth(value);
-            if (lastStepRef.current !== value) {
-              Haptics.selectionAsync();
-              lastStepRef.current = value;
-            }
-          }}
-          minimumTrackTintColor="#007AFF"
-          maximumTrackTintColor="#ccc"
-          thumbTintColor="#007AFF"
-        />
-      </Animated.View>
+        {/* Slider track */}
+        <View
+          style={[styles.sliderTrack, { height: sliderHeight }]}
+          {...panResponder.panHandlers}
+        >
+          {/* Filled track */}
+          <View style={[styles.sliderTrackFilled, { height: thumbPosition }]} />
+
+          {/* Thumb */}
+          <View style={[styles.sliderThumb, { top: thumbPosition - 10 }]}>
+            <View
+              style={[
+                styles.strokePreviewCircle,
+                {
+                  width: Math.min(strokeWidth * 2, 20),
+                  height: Math.min(strokeWidth * 2, 20),
+                  borderRadius: Math.min(strokeWidth, 10),
+                },
+              ]}
+            />
+          </View>
+        </View>
+
+        {/* Size labels */}
+        <View style={styles.sliderLabels}>
+          <Text style={styles.sliderLabel}>{minSize}</Text>
+          <Text style={styles.sliderLabel}>{maxSize}</Text>
+        </View>
+      </View>
     );
   };
 
   // Helper functions that run on JS thread
-  const startPath = (x: number, y: number) => {
-    const width =
-      currentTool === "pencil"
-        ? Math.max(1, strokeWidth - 2)
-        : currentTool === "eraser"
-        ? 20
-        : strokeWidth;
+  const startPath = (x: number, y: number, width: number = strokeWidth) => {
+    let pathWidth: number;
+    let color: string;
+    let blendMode: "clear" | undefined = undefined;
+    let opacity = 1;
 
-    const color = currentTool === "eraser" ? "#FFFFFF" : currentColor;
-    const blendMode = currentTool === "eraser" ? "clear" : undefined;
+    switch (currentTool) {
+      case "pencil":
+        pathWidth = Math.max(1, width - 2);
+        color = currentColor;
+        break;
+      case "eraser":
+        pathWidth = 20;
+        color = "#FFFFFF";
+        blendMode = "clear";
+        break;
+      case "highlight":
+        pathWidth = width + 4;
+        color = highlightColor;
+        opacity = highlightOpacity;
+        break;
+      default: // pen
+        pathWidth = width;
+        color = currentColor;
+        break;
+    }
 
     const newPath: DrawingPath = {
       segments: [`M ${x} ${y}`],
       color,
-      strokeWidth: width,
+      strokeWidth: pathWidth,
       blendMode,
+      opacity,
     };
     setCurrentPath(newPath);
   };
@@ -146,10 +190,35 @@ const WhiteboardScreen: React.FC = () => {
     setCurrentPath((prev) => {
       if (!prev) return prev;
 
-      // Add line segment to current path
+      let newX = x;
+      let newY = y;
+
+      if (currentTool === "pencil") {
+        const offset = 1.5;
+        newX = x + (Math.random() * offset * 0.9 - offset);
+        newY = y + (Math.random() * offset * 0.2 - offset);
+
+        // Use safe strokeWidth from currentPath or fallback to default
+        const baseStrokeWidth = prev.strokeWidth ?? strokeWidth;
+
+        // Slight random variations for artistic effect
+        const strokeVariation = Math.max(
+          1,
+          baseStrokeWidth * (0.85 + Math.random() * 0.3)
+        );
+        const opacityVariation = 0.6 + Math.random() * 0.4; // 0.6 to 1
+
+        return {
+          ...prev,
+          segments: [...prev.segments, `L ${newX} ${newY}`],
+          strokeWidth: strokeVariation,
+          opacity: opacityVariation,
+        };
+      }
+
       return {
         ...prev,
-        segments: [...prev.segments, `L ${x} ${y}`],
+        segments: [...prev.segments, `L ${newX} ${newY}`],
       };
     });
   };
@@ -157,19 +226,17 @@ const WhiteboardScreen: React.FC = () => {
   const endPath = () => {
     setCurrentPath((prev) => {
       if (prev && prev.segments.length > 1) {
-        // Save the completed path
         setPaths((paths) => [...paths, prev]);
       }
       return null;
     });
   };
 
-  // Create pan gesture handler
   const panGesture = Gesture.Pan()
     .enabled(drawingEnabled)
     .onStart((event) => {
       const { x, y } = event;
-      runOnJS(startPath)(x, y);
+      runOnJS(startPath)(x, y, strokeWidth);
     })
     .onUpdate((event) => {
       const { x, y } = event;
@@ -219,10 +286,8 @@ const WhiteboardScreen: React.FC = () => {
     try {
       let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${SCREEN_WIDTH}" height="${SCREEN_HEIGHT}" viewBox="0 0 ${SCREEN_WIDTH} ${SCREEN_HEIGHT}">`;
 
-      // Add white background
       svgContent += `<rect width="100%" height="100%" fill="white"/>`;
 
-      // Add all saved paths
       paths.forEach(({ segments, color, strokeWidth, blendMode }) => {
         try {
           if (segments.length === 0) return;
@@ -237,7 +302,6 @@ const WhiteboardScreen: React.FC = () => {
         }
       });
 
-      // Add current drawing path if exists
       if (currentPath && currentPath.segments.length > 0) {
         const pathData = currentPath.segments.join(" ");
         const fill = currentPath.blendMode === "clear" ? "white" : "none";
@@ -292,7 +356,6 @@ const WhiteboardScreen: React.FC = () => {
     }
   };
 
-  // Create Skia Path from SVG segments
   const createSkiaPathFromSegments = (segments: string[]) => {
     const path = Skia.Path.Make();
 
@@ -330,6 +393,7 @@ const WhiteboardScreen: React.FC = () => {
               strokeCap="round"
               strokeJoin="round"
               blendMode={pathData.blendMode}
+              opacity={pathData.opacity ?? 1}
             />
           );
         } catch (error) {
@@ -356,6 +420,7 @@ const WhiteboardScreen: React.FC = () => {
           strokeCap="round"
           strokeJoin="round"
           blendMode={currentPath.blendMode}
+          opacity={currentPath.opacity ?? 1}
         />
       );
     } catch (error) {
@@ -403,6 +468,23 @@ const WhiteboardScreen: React.FC = () => {
             <Pencil
               size={24}
               color={currentTool === "pencil" ? colors.primary : colors.text}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.toolButton,
+              currentTool === "highlight" && styles.activeTool,
+            ]}
+            onPress={() => {
+              setCurrentTool("highlight");
+              setShowStrokeSlider(true);
+              setDrawingEnabled(true);
+            }}
+          >
+            <Highlighter
+              size={24}
+              color={currentTool === "highlight" ? colors.primary : colors.text}
             />
           </TouchableOpacity>
 
@@ -478,34 +560,25 @@ const WhiteboardScreen: React.FC = () => {
               style={styles.canvasWrapper}
               collapsable={false}
             >
-              {drawingEnabled ? (
-                <GestureDetector gesture={panGesture}>
-                  <Canvas style={styles.canvas} ref={canvasRef}>
-                    {renderPaths()}
-                    {renderCurrentPath()}
-                  </Canvas>
-                </GestureDetector>
-              ) : (
+              <GestureDetector gesture={panGesture}>
                 <Canvas style={styles.canvas} ref={canvasRef}>
                   {renderPaths()}
                   {renderCurrentPath()}
                 </Canvas>
-              )}
+              </GestureDetector>
             </View>
           </View>
-          {showStrokeSlider && currentTool !== "eraser" && (
-            <Pressable
-              onPress={(e) => e.stopPropagation()} // prevent closing when tapping slider itself
-              style={{ position: "absolute", zIndex: 999 }}
-            >
-              <StrokeSlider
-                strokeWidth={strokeWidth}
-                setStrokeWidth={setStrokeWidth}
-                visible={showStrokeSlider}
-              />
-            </Pressable>
-          )}
         </Pressable>
+
+        {showStrokeSlider && currentTool !== "eraser" && (
+          <View style={styles.sliderOverlay}>
+            <StrokeSlider
+              strokeWidth={strokeWidth}
+              setStrokeWidth={setStrokeWidth}
+              visible={showStrokeSlider}
+            />
+          </View>
+        )}
       </View>
 
       <Modal
@@ -599,7 +672,6 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 14,
   },
-
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -666,55 +738,84 @@ const styles = StyleSheet.create({
   canvas: {
     flex: 1,
   },
-  strokeSliderContainer: {
+  sliderOverlay: {
     position: "absolute",
-    top: 120,
-    left: 12,
-    width: 40,
-    height: 180,
-    backgroundColor: colors.backgroundCard,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 2000,
-    elevation: 6,
+    top: 100,
+    left: 16,
+    zIndex: 999,
+    elevation: 10,
   },
   sliderContainer: {
-    position: "absolute",
-    top: 120,
-    left: 12,
-    width: 60,
-    height: 180,
-    backgroundColor: "#f0f0f0",
-    borderRadius: 30,
-    justifyContent: "center",
+    width: 70,
+    backgroundColor: "rgba(51, 51, 51, 0.95)",
+    borderRadius: 35,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
     alignItems: "center",
-    zIndex: 999, // higher than overlay
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
     elevation: 10,
-    paddingVertical: 10,
-  },
-  verticalSlider: {
-    width: 120, // match max container height
-    height: 40, // small horizontal "thickness"
-    transform: [{ rotate: "-90deg" }],
-  },
-  strokePreview: {
-    backgroundColor: "#000",
-  },
-  strokeValue: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 14,
   },
   sizeCircleContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: "#007AFF",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 8, // spacing between circle and preview
-    zIndex: 2,
+    marginBottom: 12,
+  },
+  strokeValue: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 16,
+  },
+  sliderTrack: {
+    width: 8,
+    backgroundColor: "#555",
+    borderRadius: 4,
+    position: "relative",
+    overflow: "visible",
+  },
+  sliderTrackFilled: {
+    position: "absolute",
+    width: 8,
+    backgroundColor: "#007AFF",
+    borderRadius: 4,
+    top: 0,
+  },
+  sliderThumb: {
+    position: "absolute",
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: "#fff",
+    left: -10,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  strokePreviewCircle: {
+    backgroundColor: "#333",
+  },
+  sliderLabels: {
+    marginTop: 12,
+    width: "100%",
+    flexDirection: "column",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  sliderLabel: {
+    color: "#999",
+    fontSize: 11,
+    fontWeight: "600",
+    marginVertical: 2,
   },
 });
 
