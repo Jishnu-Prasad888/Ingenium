@@ -57,7 +57,6 @@ const WhiteboardScreen: React.FC = () => {
   const [strokeWidth, setStrokeWidth] = useState(3);
   const [showStrokeSlider, setShowStrokeSlider] = useState(false);
   const [drawingEnabled, setDrawingEnabled] = useState(true);
-  const [highlightColor, setHighlightColor] = useState("#FFFF00");
   const highlightOpacity = 0.3;
 
   const colorsPalette = [
@@ -167,9 +166,10 @@ const WhiteboardScreen: React.FC = () => {
         break;
       case "highlight":
         pathWidth = width + 4;
-        color = highlightColor;
+        color = currentColor;
         opacity = highlightOpacity;
         break;
+
       default: // pen
         pathWidth = width;
         color = currentColor;
