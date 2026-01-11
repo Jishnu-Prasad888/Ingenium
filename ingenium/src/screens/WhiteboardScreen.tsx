@@ -5,63 +5,53 @@ import {
   StyleSheet,
   TouchableOpacity,
   Text,
-  Modal,
-  TextInput,
   Alert,
-  PanResponder,
-  GestureResponderEvent,
+  Dimensions,
+  Modal,
+  Pressable,
 } from "react-native";
-import {
-  Canvas,
-  Path,
-  SkPath,
-  Skia,
-  useCanvasRef,
-  matchFont,
-  Text as SkiaText,
-  Vector,
-} from "@shopify/react-native-skia";
+import { Canvas, Path, Skia, useCanvasRef } from "@shopify/react-native-skia";
 import {
   Pen,
   Pencil,
   Eraser,
-  Type,
   RotateCcw,
   Download,
   Trash2,
+  Share,
 } from "lucide-react-native";
 import * as MediaLibrary from "expo-media-library";
+import { runOnJS } from "react-native-reanimated";
 import { captureRef } from "react-native-view-shot";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import { colors } from "../theme/colors";
 import Header from "../components/Header";
-import { useNavigation } from "@react-navigation/native";
-import { WhiteboardScreenNavigationProp } from "../types/navigation";
+import { useApp } from "../context/AppContext";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-type DrawingTool = "pen" | "pencil" | "eraser" | "text";
-type TextElement = {
-  id: string;
-  text: string;
-  x: number;
-  y: number;
-  fontSize: number;
+type DrawingTool = "pen" | "pencil" | "eraser";
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+
+interface DrawingPath {
+  segments: string[]; // SVG path commands like ["M 100 100", "L 110 110", ...]
   color: string;
-};
+  strokeWidth: number;
+  blendMode?: "clear";
+}
 
 const WhiteboardScreen: React.FC = () => {
-  const navigation = useNavigation<WhiteboardScreenNavigationProp>();
+  const { setCurrentScreen } = useApp();
   const canvasRef = useCanvasRef();
   const viewRef = useRef<View>(null);
-  const [paths, setPaths] = useState<
-    Array<{ path: SkPath; color: string; strokeWidth: number }>
-  >([]);
-  const [currentPath, setCurrentPath] = useState<SkPath | null>(null);
+
+  const [paths, setPaths] = useState<DrawingPath[]>([]);
+  const [currentPath, setCurrentPath] = useState<DrawingPath | null>(null);
   const [currentColor, setCurrentColor] = useState<string>("#000000");
   const [currentStrokeWidth] = useState<number>(3);
   const [currentTool, setCurrentTool] = useState<DrawingTool>("pen");
-  const [textElements, setTextElements] = useState<TextElement[]>([]);
-  const [isAddingText, setIsAddingText] = useState(false);
-  const [textInput, setTextInput] = useState("");
   const [showColorPicker, setShowColorPicker] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
 
   const colorsPalette = [
     "#000000",
@@ -76,69 +66,77 @@ const WhiteboardScreen: React.FC = () => {
     "#8E8E93",
   ];
 
-  const font = matchFont({
-    fontFamily: "System",
-    fontSize: 24,
-  });
+  // Helper functions that run on JS thread
+  const startPath = (x: number, y: number) => {
+    const strokeWidth =
+      currentTool === "pencil"
+        ? 1
+        : currentTool === "eraser"
+        ? 20
+        : currentStrokeWidth;
+    const color = currentTool === "eraser" ? "#FFFFFF" : currentColor;
+    const blendMode = currentTool === "eraser" ? "clear" : undefined;
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (e) => {
-        const { locationX: x, locationY: y } = e.nativeEvent;
-        if (currentTool === "text") {
-          setIsAddingText(true);
-          return;
-        }
+    // Create a new path starting at the touch point
+    const newPath: DrawingPath = {
+      segments: [`M ${x} ${y}`],
+      color,
+      strokeWidth,
+      blendMode,
+    };
 
-        const newPath = Skia.Path.Make();
-        newPath.moveTo(x, y);
-        setCurrentPath(newPath);
-      },
-      onPanResponderMove: (e) => {
-        if (!currentPath || currentTool === "text") return;
-        const { locationX: x, locationY: y } = e.nativeEvent;
+    setCurrentPath(newPath);
+  };
 
-        currentPath.lineTo(x, y);
-        setCurrentPath(currentPath.copy());
-      },
-      onPanResponderRelease: () => {
-        if (currentPath) {
-          const strokeWidth =
-            currentTool === "pencil"
-              ? 1
-              : currentTool === "eraser"
-              ? 20
-              : currentStrokeWidth;
-          const color = currentTool === "eraser" ? "#FFFFFF" : currentColor;
+  const updatePath = (x: number, y: number) => {
+    setCurrentPath((prev) => {
+      if (!prev) return prev;
 
-          setPaths([...paths, { path: currentPath, color, strokeWidth }]);
-          setCurrentPath(null);
-        }
-      },
-    })
-  ).current;
-
-  const addTextElement = () => {
-    if (textInput.trim()) {
-      const newText: TextElement = {
-        id: Date.now().toString(),
-        text: textInput,
-        x: 100,
-        y: 100,
-        fontSize: 24,
-        color: currentColor,
+      // Add line segment to current path
+      return {
+        ...prev,
+        segments: [...prev.segments, `L ${x} ${y}`],
       };
-      setTextElements([...textElements, newText]);
-      setTextInput("");
-      setIsAddingText(false);
-    }
+    });
+  };
+
+  const endPath = () => {
+    setCurrentPath((prev) => {
+      if (prev && prev.segments.length > 1) {
+        // Save the completed path
+        setPaths((paths) => [...paths, prev]);
+      }
+      return null;
+    });
+  };
+
+  // Create pan gesture handler
+  const panGesture = Gesture.Pan()
+    .onStart((event) => {
+      const { x, y } = event;
+      runOnJS(startPath)(x, y);
+    })
+    .onUpdate((event) => {
+      const { x, y } = event;
+      runOnJS(updatePath)(x, y);
+    })
+    .onEnd(() => {
+      runOnJS(endPath)();
+    })
+    .minDistance(1); // Minimum distance before gesture is recognized
+
+  const handleBackPress = () => {
+    setCurrentScreen("notes-list");
   };
 
   const exportAsPNG = async () => {
     try {
-      const uri = await captureRef(viewRef, {
+      if (!viewRef.current) {
+        Alert.alert("Error", "Canvas reference not found");
+        return;
+      }
+
+      const uri = await captureRef(viewRef.current, {
         format: "png",
         quality: 1,
       });
@@ -156,35 +154,63 @@ const WhiteboardScreen: React.FC = () => {
       await MediaLibrary.createAlbumAsync("Whiteboard", asset, false);
 
       Alert.alert("Success", "Image saved to gallery!");
-    } catch (error) {
-      console.error("Error exporting PNG:", error);
+    } catch (error: any) {
+      console.error("Export failed:", error.message);
       Alert.alert("Error", "Failed to export image");
     }
   };
 
   const exportAsSVG = () => {
-    let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%">`;
+    try {
+      let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${SCREEN_WIDTH}" height="${SCREEN_HEIGHT}" viewBox="0 0 ${SCREEN_WIDTH} ${SCREEN_HEIGHT}">`;
 
-    paths.forEach(({ path, color, strokeWidth }) => {
-      const svgPath = path.toSVGString();
-      svgContent += `<path d="${svgPath}" stroke="${color}" stroke-width="${strokeWidth}" fill="none"/>`;
-    });
+      // Add white background
+      svgContent += `<rect width="100%" height="100%" fill="white"/>`;
 
-    textElements.forEach((text) => {
-      svgContent += `<text x="${text.x}" y="${text.y}" font-family="System" font-size="${text.fontSize}" fill="${text.color}">${text.text}</text>`;
-    });
+      // Add all saved paths
+      paths.forEach(({ segments, color, strokeWidth, blendMode }) => {
+        try {
+          if (segments.length === 0) return;
 
-    svgContent += "</svg>";
+          const pathData = segments.join(" ");
+          const fill = blendMode === "clear" ? "white" : "none";
+          const stroke = blendMode === "clear" ? "white" : color;
 
-    Alert.alert("SVG Content", "SVG generated! Copy the content below:", [
-      {
-        text: "Copy",
-        onPress: () => {
-          Alert.alert("Copied to clipboard!");
-        },
-      },
-      { text: "OK" },
-    ]);
+          svgContent += `<path d="${pathData}" stroke="${stroke}" stroke-width="${strokeWidth}" fill="${fill}" stroke-linecap="round" stroke-linejoin="round"/>`;
+        } catch (error) {
+          console.error("Error converting path to SVG:", error);
+        }
+      });
+
+      // Add current drawing path if exists
+      if (currentPath && currentPath.segments.length > 0) {
+        const pathData = currentPath.segments.join(" ");
+        const fill = currentPath.blendMode === "clear" ? "white" : "none";
+        const stroke =
+          currentPath.blendMode === "clear" ? "white" : currentPath.color;
+
+        svgContent += `<path d="${pathData}" stroke="${stroke}" stroke-width="${currentPath.strokeWidth}" fill="${fill}" stroke-linecap="round" stroke-linejoin="round"/>`;
+      }
+
+      svgContent += "</svg>";
+
+      Alert.alert(
+        "SVG Exported",
+        "SVG content has been generated. Would you like to copy it?",
+        [
+          {
+            text: "Copy SVG",
+            onPress: async () => {
+              Alert.alert("Copied!", "SVG copied to clipboard");
+            },
+          },
+          { text: "OK", style: "default" },
+        ]
+      );
+    } catch (error: any) {
+      console.error("Error generating SVG:", error.message);
+      Alert.alert("Error", "Failed to generate SVG");
+    }
   };
 
   const clearCanvas = () => {
@@ -198,7 +224,7 @@ const WhiteboardScreen: React.FC = () => {
           style: "destructive",
           onPress: () => {
             setPaths([]);
-            setTextElements([]);
+            setCurrentPath(null);
           },
         },
       ]
@@ -206,196 +232,278 @@ const WhiteboardScreen: React.FC = () => {
   };
 
   const undoLastAction = () => {
-    if (textElements.length > 0) {
-      setTextElements(textElements.slice(0, -1));
-    } else if (paths.length > 0) {
+    if (paths.length > 0) {
       setPaths(paths.slice(0, -1));
     }
   };
 
-  return (
-    <View style={styles.container}>
-      <Header
-        title="Whiteboard"
-        showBackButton={true}
-        onBackPress={() => navigation.goBack()}
-      />
+  // Create Skia Path from SVG segments
+  const createSkiaPathFromSegments = (segments: string[]) => {
+    const path = Skia.Path.Make();
 
-      <View style={styles.toolbar}>
-        <TouchableOpacity
-          style={[
-            styles.toolButton,
-            currentTool === "pen" && styles.activeTool,
-          ]}
-          onPress={() => setCurrentTool("pen")}
-        >
-          <Pen
-            size={24}
-            color={currentTool === "pen" ? colors.primary : colors.text}
-          />
-        </TouchableOpacity>
+    segments.forEach((segment, index) => {
+      const parts = segment.split(" ");
+      const command = parts[0];
+      const x = parseFloat(parts[1]);
+      const y = parseFloat(parts[2]);
 
-        <TouchableOpacity
-          style={[
-            styles.toolButton,
-            currentTool === "pencil" && styles.activeTool,
-          ]}
-          onPress={() => setCurrentTool("pencil")}
-        >
-          <Pencil
-            size={24}
-            color={currentTool === "pencil" ? colors.primary : colors.text}
-          />
-        </TouchableOpacity>
+      if (command === "M") {
+        path.moveTo(x, y);
+      } else if (command === "L") {
+        path.lineTo(x, y);
+      }
+    });
 
-        <TouchableOpacity
-          style={[
-            styles.toolButton,
-            currentTool === "eraser" && styles.activeTool,
-          ]}
-          onPress={() => setCurrentTool("eraser")}
-        >
-          <Eraser
-            size={24}
-            color={currentTool === "eraser" ? colors.primary : colors.text}
-          />
-        </TouchableOpacity>
+    return path;
+  };
 
-        <TouchableOpacity
-          style={[
-            styles.toolButton,
-            currentTool === "text" && styles.activeTool,
-          ]}
-          onPress={() => setCurrentTool("text")}
-        >
-          <Type
-            size={24}
-            color={currentTool === "text" ? colors.primary : colors.text}
-          />
-        </TouchableOpacity>
+  const renderPaths = () => {
+    return paths
+      .map((pathData, index) => {
+        if (pathData.segments.length === 0) return null;
 
-        <View style={styles.separator} />
+        try {
+          const path = createSkiaPathFromSegments(pathData.segments);
 
-        <TouchableOpacity
-          style={styles.toolButton}
-          onPress={() => setShowColorPicker(!showColorPicker)}
-        >
-          <View
-            style={[styles.colorPreview, { backgroundColor: currentColor }]}
-          />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.toolButton} onPress={undoLastAction}>
-          <RotateCcw size={24} color={colors.text} />
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.toolButton} onPress={clearCanvas}>
-          <Trash2 size={24} color={colors.text} />
-        </TouchableOpacity>
-      </View>
-
-      {showColorPicker && (
-        <View style={styles.colorPicker}>
-          {colorsPalette.map((color) => (
-            <TouchableOpacity
-              key={color}
-              style={[styles.colorOption, { backgroundColor: color }]}
-              onPress={() => {
-                setCurrentColor(color);
-                setShowColorPicker(false);
-              }}
-            />
-          ))}
-        </View>
-      )}
-
-      <View
-        ref={viewRef}
-        style={styles.canvasContainer}
-        {...panResponder.panHandlers}
-      >
-        <Canvas style={styles.canvas} ref={canvasRef}>
-          {paths.map(({ path, color, strokeWidth }, index) => (
+          return (
             <Path
-              key={index}
+              key={`saved-${index}`}
               path={path}
-              color={color}
+              color={pathData.color}
               style="stroke"
-              strokeWidth={strokeWidth}
+              strokeWidth={pathData.strokeWidth}
+              strokeCap="round"
+              strokeJoin="round"
+              blendMode={pathData.blendMode}
             />
-          ))}
-          {currentPath && (
-            <Path
-              path={currentPath}
-              color={currentTool === "eraser" ? "#FFFFFF" : currentColor}
-              style="stroke"
-              strokeWidth={currentTool === "eraser" ? 20 : currentStrokeWidth}
-            />
-          )}
-          {textElements.map((text) => (
-            <SkiaText
-              key={text.id}
-              x={text.x}
-              y={text.y}
-              text={text.text}
-              font={font}
-              color={text.color}
-            />
-          ))}
-        </Canvas>
-      </View>
+          );
+        } catch (error) {
+          console.error(`Error rendering path ${index}:`, error);
+          return null;
+        }
+      })
+      .filter(Boolean);
+  };
 
-      <View style={styles.exportButtons}>
-        <TouchableOpacity style={styles.exportButton} onPress={exportAsPNG}>
-          <Download size={20} color={colors.text} />
-          <Text style={styles.exportButtonText}>Export PNG</Text>
-        </TouchableOpacity>
+  const renderCurrentPath = () => {
+    if (!currentPath || currentPath.segments.length === 0) return null;
 
-        <TouchableOpacity style={styles.exportButton} onPress={exportAsSVG}>
-          <Download size={20} color={colors.text} />
-          <Text style={styles.exportButtonText}>Export SVG</Text>
-        </TouchableOpacity>
+    try {
+      const path = createSkiaPathFromSegments(currentPath.segments);
+
+      return (
+        <Path
+          key="current"
+          path={path}
+          color={currentPath.color}
+          style="stroke"
+          strokeWidth={currentPath.strokeWidth}
+          strokeCap="round"
+          strokeJoin="round"
+          blendMode={currentPath.blendMode}
+        />
+      );
+    } catch (error) {
+      console.error("Error rendering current path:", error);
+      return null;
+    }
+  };
+
+  return (
+    <SafeAreaView style={{ flex: 1 }}>
+      <View style={styles.container}>
+        <Header
+          title="Whiteboard"
+          showBackButton={true}
+          onBackPress={handleBackPress}
+        />
+
+        <View style={styles.toolbar}>
+          <TouchableOpacity
+            style={[
+              styles.toolButton,
+              currentTool === "pen" && styles.activeTool,
+            ]}
+            onPress={() => setCurrentTool("pen")}
+          >
+            <Pen
+              size={24}
+              color={currentTool === "pen" ? colors.primary : colors.text}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.toolButton,
+              currentTool === "pencil" && styles.activeTool,
+            ]}
+            onPress={() => setCurrentTool("pencil")}
+          >
+            <Pencil
+              size={24}
+              color={currentTool === "pencil" ? colors.primary : colors.text}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.toolButton,
+              currentTool === "eraser" && styles.activeTool,
+            ]}
+            onPress={() => setCurrentTool("eraser")}
+          >
+            <Eraser
+              size={24}
+              color={currentTool === "eraser" ? colors.primary : colors.text}
+            />
+          </TouchableOpacity>
+
+          <View style={styles.separator} />
+
+          <TouchableOpacity
+            style={styles.toolButton}
+            onPress={() => setShowColorPicker(!showColorPicker)}
+          >
+            <View
+              style={[styles.colorPreview, { backgroundColor: currentColor }]}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.toolButton} onPress={undoLastAction}>
+            <RotateCcw size={24} color={colors.text} />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.toolButton} onPress={clearCanvas}>
+            <Trash2 size={24} color={colors.text} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.toolButton}
+            onPress={() => setShowExportModal(true)}
+          >
+            <Share size={24} color={colors.text} />
+          </TouchableOpacity>
+        </View>
+
+        {showColorPicker && (
+          <View style={styles.colorPicker}>
+            {colorsPalette.map((color) => (
+              <TouchableOpacity
+                key={color}
+                style={[styles.colorOption, { backgroundColor: color }]}
+                onPress={() => {
+                  setCurrentColor(color);
+                  setShowColorPicker(false);
+                }}
+              />
+            ))}
+          </View>
+        )}
+
+        <View style={styles.canvasContainer}>
+          <View ref={viewRef} style={styles.canvasWrapper} collapsable={false}>
+            <GestureDetector gesture={panGesture}>
+              <Canvas style={styles.canvas} ref={canvasRef}>
+                {renderPaths()}
+                {renderCurrentPath()}
+              </Canvas>
+            </GestureDetector>
+          </View>
+        </View>
       </View>
 
       <Modal
-        visible={isAddingText}
+        visible={showExportModal}
         transparent
-        animationType="slide"
-        onRequestClose={() => setIsAddingText(false)}
+        animationType="fade"
+        onRequestClose={() => setShowExportModal(false)}
       >
-        <View style={styles.modalContainer}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Add Text</Text>
-            <TextInput
-              style={styles.textInput}
-              value={textInput}
-              onChangeText={setTextInput}
-              placeholder="Enter text..."
-              autoFocus
-              multiline
-            />
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => setIsAddingText(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalButton, styles.addButton]}
-                onPress={addTextElement}
-              >
-                <Text style={styles.addButtonText}>Add</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
+        <Pressable
+          style={styles.modalOverlay}
+          onPress={() => setShowExportModal(false)}
+        >
+          <Pressable style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Export Whiteboard</Text>
+
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => {
+                setShowExportModal(false);
+                exportAsPNG();
+              }}
+            >
+              <Download size={20} color="#fff" />
+              <Text style={styles.modalButtonText}>Export as PNG</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => {
+                setShowExportModal(false);
+                exportAsSVG();
+              }}
+            >
+              <Download size={20} color="#fff" />
+              <Text style={styles.modalButtonText}>Export as SVG</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.modalCancel}
+              onPress={() => setShowExportModal(false)}
+            >
+              <Text style={styles.modalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    width: "80%",
+    backgroundColor: colors.backgroundCard,
+    borderRadius: 12,
+    padding: 20,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 16,
+    color: colors.text,
+    textAlign: "center",
+  },
+  modalButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.primary,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  modalButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+    marginLeft: 8,
+  },
+  modalCancel: {
+    paddingVertical: 10,
+  },
+  modalCancelText: {
+    textAlign: "center",
+    color: colors.textSecondary,
+    fontSize: 14,
+  },
+
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -456,84 +564,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#FFFFFF",
   },
+  canvasWrapper: {
+    flex: 1,
+  },
   canvas: {
     flex: 1,
-  },
-  exportButtons: {
-    flexDirection: "row",
-    padding: 16,
-    backgroundColor: colors.backgroundCard,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  exportButton: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.primary,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginHorizontal: 8,
-  },
-  exportButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
-    marginLeft: 8,
-  },
-  modalContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-  },
-  modalContent: {
-    backgroundColor: colors.backgroundCard,
-    borderRadius: 16,
-    padding: 24,
-    width: "80%",
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: colors.text,
-    marginBottom: 16,
-  },
-  textInput: {
-    backgroundColor: colors.background,
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    color: colors.text,
-    minHeight: 100,
-    textAlignVertical: "top",
-  },
-  modalButtons: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    marginTop: 16,
-  },
-  modalButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginLeft: 8,
-  },
-  cancelButton: {
-    backgroundColor: "transparent",
-  },
-  addButton: {
-    backgroundColor: colors.primary,
-  },
-  cancelButtonText: {
-    color: colors.textSecondary,
-    fontSize: 16,
-  },
-  addButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
   },
 });
 

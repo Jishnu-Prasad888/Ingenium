@@ -11,18 +11,22 @@ import Divider from "../components/Divider";
 import ScrollToTopButton from "../components/ScrollToTopButton";
 import { colors } from "../theme/colors";
 import { EmptyNotesState } from "../components/EmptyNotesState";
-import { useNavigation } from "@react-navigation/native";
-import { NotesListScreenNavigationProp } from "../types/navigation";
 
 const NotesListScreen: React.FC = () => {
-  const navigation = useNavigation<NotesListScreenNavigationProp>();
-  const { notes, createNote, getFilteredAndSortedItems, queryNotes } = useApp();
+  const {
+    notes,
+    createNote,
+    getFilteredAndSortedItems,
+    queryNotes,
+    setCurrentScreen, // Use existing context for navigation
+  } = useApp();
+
   const scrollRef = useRef<ScrollView>(null);
 
   const allNotes = getFilteredAndSortedItems(notes, "note");
 
   const handleCreateBoard = () => {
-    navigation.navigate("Whiteboard");
+    setCurrentScreen("whiteboard"); // Navigate using existing context
   };
 
   return (

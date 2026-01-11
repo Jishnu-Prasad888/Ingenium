@@ -1,19 +1,11 @@
+// components/Header.tsx
 import React from "react";
-import {
-  SafeAreaView,
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-} from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { colors } from "../theme/colors";
-import { useFonts } from "expo-font";
-import { useNavigation } from "@react-navigation/native";
 import { ArrowLeft } from "lucide-react-native";
 
 interface HeaderProps {
   title?: string;
-  subtitle?: string;
   showBackButton?: boolean;
   onBackPress?: () => void;
   rightIcon?: React.ReactNode;
@@ -22,91 +14,58 @@ interface HeaderProps {
 
 const Header: React.FC<HeaderProps> = ({
   title = "Ingenium",
-  subtitle = "Harmonising Imagination and Structure",
   showBackButton = false,
+  onBackPress,
   rightIcon,
   onRightPress,
-  onBackPress,
 }) => {
-  const navigation = useNavigation();
-
-  const [fontsLoaded] = useFonts({
-    Logo: require("../../assets/fonts/logo.ttf"),
-  });
-
-  if (!fontsLoaded) {
-    return null;
-  }
-
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        {/* Left */}
-        {showBackButton && onBackPress ? (
-          <TouchableOpacity onPress={onBackPress}>
-            <ArrowLeft size={24} />
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.iconSpacer} />
-        )}
+    <View style={styles.container}>
+      {showBackButton ? (
+        <TouchableOpacity style={styles.backButton} onPress={onBackPress}>
+          <ArrowLeft size={24} color={colors.text} />
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.spacer} />
+      )}
 
-        {/* Center */}
-        <View style={styles.center}>
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.subtitle}>{subtitle}</Text>
-        </View>
+      <Text style={styles.title}>{title}</Text>
 
-        {/* Right */}
-        {rightIcon ? (
-          <TouchableOpacity style={styles.iconButton} onPress={onRightPress}>
-            {rightIcon}
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.iconSpacer} />
-        )}
-      </View>
-    </SafeAreaView>
+      {rightIcon ? (
+        <TouchableOpacity style={styles.rightButton} onPress={onRightPress}>
+          {rightIcon}
+        </TouchableOpacity>
+      ) : (
+        <View style={styles.spacer} />
+      )}
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    backgroundColor: colors.background,
-  },
   container: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: 20,
-    paddingTop: 30,
-    paddingBottom: 20,
+    paddingVertical: 16,
+    backgroundColor: colors.background,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  iconButton: {
-    padding: 6,
+  backButton: {
+    padding: 4,
   },
-  iconSpacer: {
-    width: 36,
+  rightButton: {
+    padding: 4,
   },
-  center: {
-    flex: 1,
-    alignItems: "center",
+  spacer: {
+    width: 32,
   },
   title: {
-    fontSize: 52,
-    fontFamily: "Logo",
+    fontSize: 20,
+    fontWeight: "600" as const,
     color: colors.text,
-    letterSpacing: -1,
-    marginBottom: -6,
-    textAlign: "center",
-  },
-  subtitle: {
-    fontSize: 11,
-    fontFamily: "serif",
-    color: colors.text,
-    letterSpacing: 2,
-    marginTop: 8,
-    textAlign: "center",
   },
 });
 

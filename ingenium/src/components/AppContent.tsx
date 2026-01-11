@@ -1,6 +1,8 @@
-// src/components/AppContent.tsx
+import "react-native-gesture-handler";
 import React from "react";
 import { View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+
 import { useApp } from "../context/AppContext";
 import NotesListScreen from "../screens/NotesListScreen";
 import FolderExplorerScreen from "../screens/FolderExplorerScreen";
@@ -19,28 +21,30 @@ export const AppContent: React.FC = () => {
     useApp();
 
   return (
-    <View style={{ flex: 1 }}>
-      <DeepLinkHandler />
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
+        <DeepLinkHandler />
 
-      {isSharing ? (
-        <View style={{ flex: 1, backgroundColor: colors.background }}>
-          <ShareScreen
-            sharedContent={sharedContent}
-            onContentSaved={clearSharedContent}
-          />
-        </View>
-      ) : (
-        <>
-          {currentScreen === "notes-list" && <NotesListScreen />}
-          {currentScreen === "folder-explorer" && <FolderExplorerScreen />}
-          {currentScreen === "note-editor" && <NoteEditorScreen />}
-          {currentScreen === "query-notes" && <QueryNotesScreen />}
-          {currentScreen === "WhiteboardScreen" && <WhiteboardScreen />}
+        {isSharing ? (
+          <View style={{ flex: 1, backgroundColor: colors.background }}>
+            <ShareScreen
+              sharedContent={sharedContent}
+              onContentSaved={clearSharedContent}
+            />
+          </View>
+        ) : (
+          <>
+            {currentScreen === "notes-list" && <NotesListScreen />}
+            {currentScreen === "folder-explorer" && <FolderExplorerScreen />}
+            {currentScreen === "note-editor" && <NoteEditorScreen />}
+            {currentScreen === "query-notes" && <QueryNotesScreen />}
+            {currentScreen === "whiteboard" && <WhiteboardScreen />}
 
-          <BottomNavigationBar />
-          <SyncIndicator />
-        </>
-      )}
-    </View>
+            <BottomNavigationBar />
+            <SyncIndicator />
+          </>
+        )}
+      </View>
+    </GestureHandlerRootView>
   );
 };
