@@ -263,7 +263,7 @@ const WhiteboardScreen: React.FC = () => {
         quality: 1,
       });
 
-      const { status } = await MediaLibrary.requestPermissionsAsync();
+      const { status } = await MediaLibrary.requestPermissionsAsync(false);
       if (status !== "granted") {
         Alert.alert(
           "Permission required",
