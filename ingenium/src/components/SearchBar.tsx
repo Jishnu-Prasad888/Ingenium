@@ -21,7 +21,7 @@ const SearchBar: React.FC = () => {
           }}
         >
           <TextInput
-            style={{ flex: 1, fontSize: 17, color: colors.text }}
+            style={{ flex: 1, fontSize: 14, color: colors.text }}
             placeholder="Search ...."
             placeholderTextColor={colors.textSecondary}
             value={searchQuery}

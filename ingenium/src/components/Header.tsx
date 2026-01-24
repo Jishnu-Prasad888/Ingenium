@@ -19,7 +19,7 @@ const Header: React.FC = () => {
       >
         <Text
           style={{
-            fontSize: 52,
+            fontSize: 40,
             fontFamily: "Logo",
             textAlign: "center",
             color: colors.text,

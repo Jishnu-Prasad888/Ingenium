@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   Text,
   Animated,
+  ViewStyle,
+  TextStyle,
 } from "react-native";
 import { Plus, NotebookPen, Brain } from "lucide-react-native";
 import { useApp } from "../context/AppContext";
@@ -63,12 +65,12 @@ const NotesListScreen: React.FC = () => {
           <Text
             style={{
               fontSize: 16,
-              fontWeight: "500",
+              fontWeight: "500" as const,
               color: colors.text,
               marginRight: 7,
             }}
           >
-            Create a new note
+            New note
           </Text>
 
           <Plus size={20} color={colors.primary} />
@@ -110,13 +112,13 @@ const styles = {
     borderRadius: 12,
     paddingHorizontal: 16,
     height: 40,
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: "row" as const,
+    alignItems: "center" as const,
     gap: 8,
-  },
+  } as ViewStyle,
   text: {
     fontSize: 16,
     color: colors.text,
-    fontWeight: "500",
-  },
+    fontWeight: "500" as const,
+  } as TextStyle,
 };
