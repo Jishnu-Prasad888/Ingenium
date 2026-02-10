@@ -1,6 +1,6 @@
 import React from "react";
 import { View, TouchableOpacity } from "react-native";
-import { List, FilePlus, Folder } from "lucide-react-native";
+import { List, FilePlus, Folder, Pencil } from "lucide-react-native";
 import { useApp } from "../context/AppContext";
 import { colors } from "../theme/colors";
 
@@ -71,7 +71,7 @@ const BottomNavigationBar: React.FC = () => {
           onPress={() => {
             if (notes.length > 0) {
               const mostRecent = notes.reduce((latest, note) =>
-                note.createdAt > latest.createdAt ? note : latest
+                note.createdAt > latest.createdAt ? note : latest,
               );
               setCurrentNoteId(mostRecent.id);
               setCurrentScreen("note-editor");
@@ -100,6 +100,25 @@ const BottomNavigationBar: React.FC = () => {
           }}
         >
           <Folder size={24} color={colors.text} />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={{
+            flex: 1,
+            backgroundColor:
+              currentScreen === "whiteboard"
+                ? colors.backgroundCard
+                : "transparent",
+            borderRadius: 16,
+            padding: 12,
+            alignItems: "center",
+          }}
+          onPress={() => {
+            setCurrentFolderId(null);
+            setCurrentScreen("whiteboard");
+          }}
+        >
+          <Pencil size={24} color={colors.text} />
         </TouchableOpacity>
       </View>
     </View>

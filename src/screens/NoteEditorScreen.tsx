@@ -94,7 +94,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
               >
                 {codeBlockContent}
               </Text>
-            </View>
+            </View>,
           );
           continue;
         }
@@ -153,7 +153,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             >
               {textAfterCheckbox}
             </Text>
-          </Pressable>
+          </Pressable>,
         );
         continue;
       }
@@ -222,7 +222,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
             }}
           >
             {markdownContent}
-          </Markdown>
+          </Markdown>,
         );
       }
     }
@@ -240,10 +240,10 @@ const NoteEditorScreen: React.FC = () => {
 
   useEffect(() => {
     const showSub = Keyboard.addListener("keyboardDidShow", () =>
-      setKeyboardVisible(true)
+      setKeyboardVisible(true),
     );
     const hideSub = Keyboard.addListener("keyboardDidHide", () =>
-      setKeyboardVisible(false)
+      setKeyboardVisible(false),
     );
 
     return () => {

@@ -50,6 +50,7 @@ interface AppContextType {
   renameFolder: (folderId: string, newName: string) => Promise<boolean>;
   moveNote: (noteId: string, targetFolderId: string | null) => Promise<boolean>;
   queryNotes: () => Promise<void>;
+  createWhiteboard: (folderId?: string | null) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -96,6 +97,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     }
   }, []);
 
+  const createWhiteboard = useCallback(
+    async (folderId: string | null = null) => {
+      const newNote: Note = {
+        id: generateSyncId(),
+        folderId: folderId || currentFolderId,
+        title: "Untitled",
+        content: "[]", // serialized strokes / elements later
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        syncStatus: "pending",
+        type: "whiteboard",
+      };
+
+      setNotes((prev) => [...prev, newNote]);
+      await StorageService.saveNote(newNote);
+
+      setCurrentNoteId(newNote.id);
+      setCurrentScreen("whiteboard");
+    },
+    [currentFolderId],
+  );
+
   // Add to AppProvider component
   const queryNotes = useCallback(async () => {
     const hasKey = await GeminiService.hasApiKey();
@@ -111,7 +134,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
               setCurrentScreen("query-notes");
             },
           },
-        ]
+        ],
       );
       return;
     }
@@ -124,7 +147,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
 
   const renameFolder = async (folderId: string, newName: string) => {
     setFolders((prev) =>
-      prev.map((f) => (f.id === folderId ? { ...f, name: newName } : f))
+      prev.map((f) => (f.id === folderId ? { ...f, name: newName } : f)),
     );
     return true;
   };
@@ -192,7 +215,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
 
     try {
       console.log(
-        `Flushing ${pendingUpdatesRef.current.size} pending updates...`
+        `Flushing ${pendingUpdatesRef.current.size} pending updates...`,
       );
 
       // Process all pending updates
@@ -215,7 +238,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
 
           // Update local state
           setNotes((prev) =>
-            prev.map((n) => (n.id === noteId ? updatedNote : n))
+            prev.map((n) => (n.id === noteId ? updatedNote : n)),
           );
 
           // Save to database
@@ -248,8 +271,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
                     ? updates.title.trim()
                     : note.title,
               }
-            : note
-        )
+            : note,
+        ),
       );
 
       // Store the update for later saving
@@ -270,7 +293,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         await flushPendingSaves();
       }, 500);
     },
-    [flushPendingSaves]
+    [flushPendingSaves],
   );
 
   const moveNote = useCallback(
@@ -298,12 +321,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
                   updatedAt: Date.now(),
                   syncStatus: "pending",
                 }
-              : n
-          )
+              : n,
+          ),
         );
 
         // Save to database
-        const updatedNote = {
+        const updatedNote: Note = {
           ...note,
           folderId: targetFolderId,
           updatedAt: Date.now(),
@@ -312,7 +335,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         await StorageService.saveNote(updatedNote);
 
         console.log(
-          `Moved note "${note.title}" to folder ${targetFolderId || "root"}`
+          `Moved note "${note.title}" to folder ${targetFolderId || "root"}`,
         );
         return true;
       } catch (error) {
@@ -320,7 +343,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         return false;
       }
     },
-    [notes]
+    [notes],
   );
 
   // Immediate update (for when user navigates away or explicitly saves)
@@ -350,14 +373,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
                     ? updates.title.trim()
                     : note.title,
               }
-            : note
-        )
+            : note,
+        ),
       );
 
       // Save immediately
       const updated = notes.find((n) => n.id === id);
       if (updated) {
-        const finalNote = {
+        const finalNote: Note = {
           ...updated,
           ...updates,
           updatedAt: Date.now(),
@@ -370,7 +393,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         await StorageService.saveNote(finalNote);
       }
     },
-    [notes]
+    [notes],
   );
 
   // Keep the original updateNote for backward compatibility (immediate save)
@@ -379,7 +402,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       // Default to immediate save for non-typing updates
       updateNoteImmediate(id, updates);
     },
-    [updateNoteImmediate]
+    [updateNoteImmediate],
   );
 
   // Create folder function
@@ -405,7 +428,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       // Save to database
       await StorageService.saveFolder(newFolder);
     },
-    []
+    [],
   );
 
   // Create note function
@@ -432,7 +455,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
       setCurrentNoteId(newNote.id);
       setCurrentScreen("note-editor");
     },
-    [currentFolderId]
+    [currentFolderId],
   );
 
   // Delete note function
@@ -457,7 +480,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         return false;
       }
     },
-    [currentNoteId]
+    [currentNoteId],
   );
 
   // Delete folder function
@@ -493,7 +516,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
         return false;
       }
     },
-    [currentFolderId, folders, notes]
+    [currentFolderId, folders, notes],
   );
 
   // Get current path function
@@ -559,16 +582,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
                   ? a.title
                   : ""
                 : a.name && typeof a.name === "string"
-                ? a.name
-                : "";
+                  ? a.name
+                  : "";
             const nameB =
               type === "note"
                 ? b.title && typeof b.title === "string"
                   ? b.title
                   : ""
                 : b.name && typeof b.name === "string"
-                ? b.name
-                : "";
+                  ? b.name
+                  : "";
             return nameA.localeCompare(nameB);
           case "alpha-desc":
             const nameA2 =
@@ -577,23 +600,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
                   ? a.title
                   : ""
                 : a.name && typeof a.name === "string"
-                ? a.name
-                : "";
+                  ? a.name
+                  : "";
             const nameB2 =
               type === "note"
                 ? b.title && typeof b.title === "string"
                   ? b.title
                   : ""
                 : b.name && typeof b.name === "string"
-                ? b.name
-                : "";
+                  ? b.name
+                  : "";
             return nameB2.localeCompare(nameA2);
           default:
             return 0;
         }
       });
     },
-    [searchQuery, sortBy]
+    [searchQuery, sortBy],
   );
 
   const value: AppContextType = {
@@ -631,6 +654,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({
     renameFolder,
     moveNote,
     queryNotes,
+    createWhiteboard,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

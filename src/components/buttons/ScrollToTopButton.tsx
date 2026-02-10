@@ -1,7 +1,7 @@
 import React, { RefObject } from "react";
 import { TouchableOpacity, ScrollView } from "react-native";
 import { ChevronUp } from "lucide-react-native";
-import { colors } from "../theme/colors";
+import { colors } from "../../theme/colors";
 
 interface ScrollToTopButtonProps {
   scrollRef: RefObject<ScrollView | null>;
