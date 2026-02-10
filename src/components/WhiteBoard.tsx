@@ -1,13 +1,34 @@
 import React, { useState, useRef } from "react";
-import { View, StyleSheet, Text, TouchableOpacity, Modal } from "react-native";
+import {
+  View,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  Modal,
+  Alert,
+} from "react-native";
 import Svg, { Path, G } from "react-native-svg";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as FileSystem from "expo-file-system";
+import * as Sharing from "expo-sharing";
+import * as DocumentPicker from "expo-document-picker";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 type Stroke = {
   path: string;
   color: string;
   width: number;
   isEraser?: boolean;
+  isPencil?: boolean;
+};
+
+type ToolType = "pen" | "pencil" | "eraser";
+
+type WhiteboardState = {
+  strokes: Stroke[];
+  scale: number;
+  translateX: number;
+  translateY: number;
 };
 
 const COLORS = [
@@ -21,14 +42,17 @@ const COLORS = [
   { name: "Orange", value: "#F97316" },
 ];
 
+const STORAGE_KEY = "@whiteboard_autosave";
+
 export default function Whiteboard() {
   const [strokes, setStrokes] = useState<Stroke[]>([]);
   const [scale, setScale] = useState(1);
   const [translateX, setTranslateX] = useState(0);
   const [translateY, setTranslateY] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmClearOpen, setConfirmClearOpen] = useState(false);
   const [currentColor, setCurrentColor] = useState("#000000");
-  const [isEraser, setIsEraser] = useState(false);
+  const [currentTool, setCurrentTool] = useState<ToolType>("pen");
 
   const currentPath = useRef("");
   const isDrawing = useRef(false);
@@ -37,6 +61,47 @@ export default function Whiteboard() {
   const initialPinchScale = useRef(1);
   const initialPinchMidpoint = useRef({ x: 0, y: 0 });
   const initialTranslate = useRef({ x: 0, y: 0 });
+
+  // Auto-save whenever strokes change
+  React.useEffect(() => {
+    const saveToStorage = async () => {
+      try {
+        const state: WhiteboardState = {
+          strokes,
+          scale,
+          translateX,
+          translateY,
+        };
+        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch (error) {
+        console.error("Error auto-saving:", error);
+      }
+    };
+
+    if (strokes.length > 0) {
+      saveToStorage();
+    }
+  }, [strokes, scale, translateX, translateY]);
+
+  // Load from storage on mount
+  React.useEffect(() => {
+    const loadFromStorage = async () => {
+      try {
+        const savedState = await AsyncStorage.getItem(STORAGE_KEY);
+        if (savedState) {
+          const state: WhiteboardState = JSON.parse(savedState);
+          setStrokes(state.strokes);
+          setScale(state.scale);
+          setTranslateX(state.translateX);
+          setTranslateY(state.translateY);
+        }
+      } catch (error) {
+        console.error("Error loading:", error);
+      }
+    };
+
+    loadFromStorage();
+  }, []);
 
   const getDistance = (touch1: any, touch2: any) => {
     const dx = touch1.pageX - touch2.pageX;
@@ -59,26 +124,27 @@ export default function Whiteboard() {
   };
 
   const handleTouchStart = (e: any) => {
+    if (menuOpen || confirmClearOpen) return;
+
     const touches = e.nativeEvent.touches;
     lastTouchCount.current = touches.length;
 
     if (touches.length === 1) {
-      // Start drawing
       isDrawing.current = true;
       const touch = touches[0];
       const canvasPoint = screenToCanvas(touch.locationX, touch.locationY);
       currentPath.current = `M ${canvasPoint.x} ${canvasPoint.y}`;
-      setStrokes((prev) => [
-        ...prev,
-        {
-          path: currentPath.current,
-          color: isEraser ? "#FFFFFF" : currentColor,
-          width: isEraser ? 20 : 4,
-          isEraser: isEraser,
-        },
-      ]);
+
+      const strokeConfig = {
+        path: currentPath.current,
+        color: currentTool === "eraser" ? "#FFFFFF" : currentColor,
+        width: currentTool === "eraser" ? 20 : currentTool === "pencil" ? 2 : 4,
+        isEraser: currentTool === "eraser",
+        isPencil: currentTool === "pencil",
+      };
+
+      setStrokes((prev) => [...prev, strokeConfig]);
     } else if (touches.length === 2) {
-      // Start pinch
       isDrawing.current = false;
       initialPinchDistance.current = getDistance(touches[0], touches[1]);
       initialPinchScale.current = scale;
@@ -88,10 +154,11 @@ export default function Whiteboard() {
   };
 
   const handleTouchMove = (e: any) => {
+    if (menuOpen || confirmClearOpen) return;
+
     const touches = e.nativeEvent.touches;
 
     if (touches.length === 1 && isDrawing.current) {
-      // Continue drawing
       const touch = touches[0];
       const canvasPoint = screenToCanvas(touch.locationX, touch.locationY);
       currentPath.current += ` L ${canvasPoint.x} ${canvasPoint.y}`;
@@ -107,19 +174,16 @@ export default function Whiteboard() {
         return updated;
       });
     } else if (touches.length === 2) {
-      // Continue pinch
       const currentDistance = getDistance(touches[0], touches[1]);
       const currentMidpoint = getMidpoint(touches[0], touches[1]);
 
       if (initialPinchDistance.current > 0) {
-        // Calculate new scale
         const scaleRatio = currentDistance / initialPinchDistance.current;
         const newScale = Math.max(
           0.5,
           Math.min(5, initialPinchScale.current * scaleRatio),
         );
 
-        // Calculate pan based on midpoint movement
         const dx = currentMidpoint.x - initialPinchMidpoint.current.x;
         const dy = currentMidpoint.y - initialPinchMidpoint.current.y;
 
@@ -136,7 +200,6 @@ export default function Whiteboard() {
     if (touches.length === 0) {
       isDrawing.current = false;
     } else if (touches.length === 1 && lastTouchCount.current === 2) {
-      // One finger lifted from pinch
       isDrawing.current = false;
     }
 
@@ -145,22 +208,176 @@ export default function Whiteboard() {
 
   const handleColorSelect = (color: string) => {
     setCurrentColor(color);
-    setIsEraser(false);
+    setCurrentTool("pen");
+    setMenuOpen(false);
+  };
+
+  const handlePencilColorSelect = (color: string) => {
+    setCurrentColor(color);
+    setCurrentTool("pencil");
     setMenuOpen(false);
   };
 
   const handleEraserSelect = () => {
-    setIsEraser(true);
+    setCurrentTool("eraser");
     setMenuOpen(false);
   };
 
   const toggleTool = () => {
-    setIsEraser(!isEraser);
+    if (currentTool === "pen") {
+      setCurrentTool("pencil");
+    } else if (currentTool === "pencil") {
+      setCurrentTool("eraser");
+    } else {
+      setCurrentTool("pen");
+    }
   };
 
-  const handleClearAll = () => {
-    setStrokes([]);
+  const handleClearRequest = () => {
     setMenuOpen(false);
+    setConfirmClearOpen(true);
+  };
+
+  const handleConfirmClear = async () => {
+    setStrokes([]);
+    setScale(1);
+    setTranslateX(0);
+    setTranslateY(0);
+    setConfirmClearOpen(false);
+
+    // Clear auto-save
+    try {
+      await AsyncStorage.removeItem(STORAGE_KEY);
+    } catch (error) {
+      console.error("Error clearing storage:", error);
+    }
+  };
+
+  const handleCancelClear = () => {
+    setConfirmClearOpen(false);
+  };
+
+  // Export to file and share to apps (WhatsApp, email, etc.)
+  const handleExport = async () => {
+    try {
+      const state: WhiteboardState = {
+        strokes,
+        scale,
+        translateX,
+        translateY,
+      };
+
+      const jsonContent = JSON.stringify(state, null, 2);
+      const filename = `whiteboard_${new Date().getTime()}.json`;
+
+      // Try to get a filesystem directory
+      const fs = FileSystem as any;
+      let directory = fs.cacheDirectory || fs.documentDirectory;
+
+      if (!directory) {
+        // Fallback for Expo Go or web: Show data and allow manual save
+        Alert.alert(
+          "Export Whiteboard",
+          "File system not available in this environment. Copy the data below and save it manually to a .json file.",
+          [
+            {
+              text: "Show Data",
+              onPress: () => {
+                console.log("Whiteboard Data:", jsonContent);
+                Alert.alert(
+                  "Whiteboard Data",
+                  `Data logged to console. Check developer console to copy full data.\n\nPreview:\n${jsonContent.substring(0, 200)}...`,
+                  [{ text: "OK" }],
+                );
+              },
+            },
+            { text: "Cancel", style: "cancel" },
+          ],
+        );
+        setMenuOpen(false);
+        return;
+      }
+
+      const fileUri = directory + filename;
+
+      // Write file to filesystem
+      await FileSystem.writeAsStringAsync(fileUri, jsonContent);
+
+      // Share the file to various apps (WhatsApp, Email, Files, etc.)
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(fileUri, {
+          mimeType: "application/json",
+          dialogTitle: "Share Whiteboard",
+          UTI: "public.json",
+        });
+
+        // Success message after sharing
+        setMenuOpen(false);
+      } else {
+        // If sharing is not available, just show success
+        Alert.alert(
+          "Exported Successfully",
+          `Whiteboard saved to:\n${fileUri}\n\nYou can find it in your device's file manager.`,
+          [{ text: "OK" }],
+        );
+        setMenuOpen(false);
+      }
+    } catch (error) {
+      Alert.alert(
+        "Export Error",
+        `Failed to export whiteboard.\n\nError: ${(error as Error).message}\n\nTip: If using Expo Go, try building a standalone app for full file system access.`,
+      );
+      console.error("Export error:", error);
+    }
+  };
+
+  // Import from file
+  const handleImport = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: "application/json",
+        copyToCacheDirectory: true,
+      });
+
+      // Handle both old and new DocumentPicker API
+      if (
+        "canceled" in result &&
+        !result.canceled &&
+        result.assets &&
+        result.assets.length > 0
+      ) {
+        // New API (Expo SDK 48+)
+        const asset = result.assets[0];
+        const content = await FileSystem.readAsStringAsync(asset.uri);
+        const state: WhiteboardState = JSON.parse(content);
+
+        setStrokes(state.strokes);
+        setScale(state.scale);
+        setTranslateX(state.translateX);
+        setTranslateY(state.translateY);
+
+        Alert.alert("Success", "Whiteboard loaded successfully!");
+      } else if ("type" in result && result.type === "success") {
+        // Old API (Expo SDK < 48)
+        const content = await FileSystem.readAsStringAsync((result as any).uri);
+        const state: WhiteboardState = JSON.parse(content);
+
+        setStrokes(state.strokes);
+        setScale(state.scale);
+        setTranslateX(state.translateX);
+        setTranslateY(state.translateY);
+
+        Alert.alert("Success", "Whiteboard loaded successfully!");
+      }
+
+      setMenuOpen(false);
+    } catch (error) {
+      Alert.alert(
+        "Import Error",
+        `Failed to import whiteboard.\n\nError: ${(error as Error).message}`,
+      );
+      console.error("Import error:", error);
+    }
   };
 
   return (
@@ -183,6 +400,7 @@ export default function Whiteboard() {
                   fill="none"
                   strokeLinecap="round"
                   strokeLinejoin="round"
+                  opacity={stroke.isPencil ? 0.7 : 1}
                 />
               ))}
             </G>
@@ -200,16 +418,29 @@ export default function Whiteboard() {
             </View>
           </TouchableOpacity>
 
-          {/* Current Tool Indicator - Now Clickable */}
+          {/* Current Tool Indicator */}
           <TouchableOpacity
             style={styles.toolIndicator}
             onPress={toggleTool}
             activeOpacity={0.7}
           >
-            {isEraser ? (
+            {currentTool === "eraser" ? (
               <View style={styles.toolContent}>
                 <Text style={styles.toolEmoji}>🧹</Text>
                 <Text style={styles.toolText}>Eraser</Text>
+              </View>
+            ) : currentTool === "pencil" ? (
+              <View style={styles.toolContent}>
+                <View style={styles.penIndicator}>
+                  <View
+                    style={[
+                      styles.colorIndicator,
+                      { backgroundColor: currentColor },
+                    ]}
+                  />
+                  <Text style={styles.toolEmoji}>✏️</Text>
+                </View>
+                <Text style={styles.toolText}>Pencil</Text>
               </View>
             ) : (
               <View style={styles.toolContent}>
@@ -220,7 +451,7 @@ export default function Whiteboard() {
                       { backgroundColor: currentColor },
                     ]}
                   />
-                  <Text style={styles.toolEmoji}>✏️</Text>
+                  <Text style={styles.toolEmoji}>🖊️</Text>
                 </View>
                 <Text style={styles.toolText}>Pen</Text>
               </View>
@@ -243,25 +474,77 @@ export default function Whiteboard() {
               <View style={styles.menuContainer}>
                 <Text style={styles.menuTitle}>Tools</Text>
 
-                {/* Colors */}
+                {/* Save/Load Section */}
                 <View style={styles.section}>
-                  <Text style={styles.sectionTitle}>Pen Colors</Text>
+                  <Text style={styles.sectionTitle}>💾 Save & Load</Text>
+                  <View style={styles.saveLoadButtons}>
+                    <TouchableOpacity
+                      style={styles.saveButton}
+                      onPress={handleExport}
+                    >
+                      <Text style={styles.saveButtonText}>📤 Export</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.loadButton}
+                      onPress={handleImport}
+                    >
+                      <Text style={styles.loadButtonText}>📥 Import</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.autoSaveHint}>
+                    Auto-saves locally • Export shares to WhatsApp, Email, Files
+                    & more
+                  </Text>
+                </View>
+
+                {/* Pen Colors */}
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>🖊️ Pen Colors (Bold)</Text>
                   <View style={styles.colorGrid}>
                     {COLORS.map((color) => (
                       <TouchableOpacity
-                        key={color.value}
+                        key={`pen-${color.value}`}
                         style={[
                           styles.colorButton,
                           { backgroundColor: color.value },
                           currentColor === color.value &&
-                            !isEraser &&
+                            currentTool === "pen" &&
                             styles.selectedColor,
                         ]}
                         onPress={() => handleColorSelect(color.value)}
                       >
-                        {currentColor === color.value && !isEraser && (
-                          <Text style={styles.checkmark}>✓</Text>
-                        )}
+                        {currentColor === color.value &&
+                          currentTool === "pen" && (
+                            <Text style={styles.checkmark}>✓</Text>
+                          )}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Pencil Colors */}
+                <View style={styles.section}>
+                  <Text style={styles.sectionTitle}>
+                    ✏️ Pencil Colors (Thin)
+                  </Text>
+                  <View style={styles.colorGrid}>
+                    {COLORS.map((color) => (
+                      <TouchableOpacity
+                        key={`pencil-${color.value}`}
+                        style={[
+                          styles.colorButton,
+                          styles.pencilButton,
+                          { backgroundColor: color.value },
+                          currentColor === color.value &&
+                            currentTool === "pencil" &&
+                            styles.selectedColor,
+                        ]}
+                        onPress={() => handlePencilColorSelect(color.value)}
+                      >
+                        {currentColor === color.value &&
+                          currentTool === "pencil" && (
+                            <Text style={styles.checkmark}>✓</Text>
+                          )}
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -269,13 +552,16 @@ export default function Whiteboard() {
 
                 {/* Eraser */}
                 <TouchableOpacity
-                  style={[styles.toolButton, isEraser && styles.selectedTool]}
+                  style={[
+                    styles.toolButton,
+                    currentTool === "eraser" && styles.selectedTool,
+                  ]}
                   onPress={handleEraserSelect}
                 >
                   <Text
                     style={[
                       styles.toolButtonText,
-                      isEraser && styles.selectedToolText,
+                      currentTool === "eraser" && styles.selectedToolText,
                     ]}
                   >
                     🧹 Eraser
@@ -285,9 +571,11 @@ export default function Whiteboard() {
                 {/* Clear All */}
                 <TouchableOpacity
                   style={styles.clearButton}
-                  onPress={handleClearAll}
+                  onPress={handleClearRequest}
                 >
-                  <Text style={styles.clearButtonText}>🗑️ Clear All</Text>
+                  <Text style={styles.clearButtonText}>
+                    🗑️ Clear Entire Screen
+                  </Text>
                 </TouchableOpacity>
 
                 {/* Close Button */}
@@ -300,6 +588,40 @@ export default function Whiteboard() {
               </View>
             </TouchableOpacity>
           </Modal>
+
+          {/* Confirmation Dialog */}
+          <Modal
+            visible={confirmClearOpen}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={handleCancelClear}
+          >
+            <View style={styles.confirmOverlay}>
+              <View style={styles.confirmDialog}>
+                <Text style={styles.confirmTitle}>Clear Entire Screen?</Text>
+                <Text style={styles.confirmMessage}>
+                  This will erase all your drawings. This action cannot be
+                  undone.
+                </Text>
+
+                <View style={styles.confirmButtons}>
+                  <TouchableOpacity
+                    style={styles.cancelButton}
+                    onPress={handleCancelClear}
+                  >
+                    <Text style={styles.cancelButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.confirmButton}
+                    onPress={handleConfirmClear}
+                  >
+                    <Text style={styles.confirmButtonText}>Clear All</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
         </View>
       </SafeAreaView>
     </View>
@@ -309,54 +631,50 @@ export default function Whiteboard() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FAFAFA",
+    backgroundColor: "#fff",
   },
-
-  /* Floating menu button */
   menuButton: {
     position: "absolute",
     top: 16,
     left: 16,
-    width: 44,
-    height: 44,
-    borderRadius: 14,
-    backgroundColor: "#FFFFFF",
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#000",
     justifyContent: "center",
     alignItems: "center",
     zIndex: 1000,
+    elevation: 5,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   menuIcon: {
-    width: 18,
-    height: 14,
+    width: 24,
+    height: 18,
     justifyContent: "space-between",
   },
   menuLine: {
     width: "100%",
-    height: 2,
-    backgroundColor: "#111827",
+    height: 3,
+    backgroundColor: "#fff",
     borderRadius: 2,
   },
-
-  /* Tool indicator */
   toolIndicator: {
     position: "absolute",
     top: 16,
     right: 16,
-    backgroundColor: "#FFFFFF",
+    backgroundColor: "rgba(0,0,0,0.85)",
     paddingHorizontal: 16,
     paddingVertical: 12,
-    borderRadius: 16,
+    borderRadius: 24,
     zIndex: 1000,
+    elevation: 5,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
   },
   toolContent: {
     alignItems: "center",
@@ -368,128 +686,216 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   colorIndicator: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 1.5,
-    borderColor: "#E5E7EB",
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#fff",
   },
   toolEmoji: {
-    fontSize: 18,
+    fontSize: 24,
   },
   toolText: {
-    color: "#111827",
-    fontSize: 13,
-    fontWeight: "600",
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "700",
+    marginBottom: 2,
   },
   tapHint: {
-    color: "#9CA3AF",
+    color: "rgba(255,255,255,0.6)",
     fontSize: 10,
     marginTop: 4,
+    fontStyle: "italic",
   },
-
-  /* Modal */
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.35)",
+    backgroundColor: "rgba(0,0,0,0.5)",
     justifyContent: "flex-end",
   },
   menuContainer: {
-    backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     padding: 24,
     paddingBottom: 40,
+    maxHeight: "90%",
   },
   menuTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    marginBottom: 24,
+    fontSize: 24,
+    fontWeight: "bold",
+    marginBottom: 20,
     textAlign: "center",
-    color: "#111827",
   },
-
-  /* Sections */
   section: {
     marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: "600",
     marginBottom: 12,
-    color: "#6B7280",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
+    color: "#333",
   },
-
-  /* Color picker */
+  saveLoadButtons: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  saveButton: {
+    flex: 1,
+    backgroundColor: "#3B82F6",
+    padding: 14,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  saveButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  loadButton: {
+    flex: 1,
+    backgroundColor: "#10B981",
+    padding: 14,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  loadButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  autoSaveHint: {
+    fontSize: 11,
+    color: "#6b7280",
+    marginTop: 8,
+    textAlign: "center",
+    fontStyle: "italic",
+  },
   colorGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 14,
+    gap: 12,
   },
   colorButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
     borderColor: "transparent",
   },
+  pencilButton: {
+    opacity: 0.8,
+  },
   selectedColor: {
-    borderColor: "#111827",
+    borderColor: "#000",
+    borderWidth: 3,
   },
   checkmark: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "700",
+    color: "#fff",
+    fontSize: 24,
+    fontWeight: "bold",
   },
-
-  /* Tool buttons */
   toolButton: {
-    backgroundColor: "#F3F4F6",
-    paddingVertical: 14,
-    borderRadius: 14,
+    backgroundColor: "#f0f0f0",
+    padding: 16,
+    borderRadius: 12,
     marginBottom: 12,
     alignItems: "center",
   },
   selectedTool: {
-    backgroundColor: "#111827",
+    backgroundColor: "#000",
   },
   toolButtonText: {
-    fontSize: 15,
+    fontSize: 18,
     fontWeight: "600",
-    color: "#111827",
+    color: "#333",
   },
   selectedToolText: {
-    color: "#FFFFFF",
+    color: "#fff",
   },
-
-  /* Destructive action */
   clearButton: {
-    backgroundColor: "#FEE2E2",
-    paddingVertical: 14,
-    borderRadius: 14,
+    backgroundColor: "#EF4444",
+    padding: 16,
+    borderRadius: 12,
     marginBottom: 12,
     alignItems: "center",
   },
   clearButtonText: {
-    color: "#991B1B",
-    fontSize: 15,
+    color: "#fff",
+    fontSize: 18,
     fontWeight: "600",
   },
-
-  /* Close */
   closeButton: {
-    backgroundColor: "#F3F4F6",
-    paddingVertical: 14,
-    borderRadius: 14,
+    backgroundColor: "#e0e0e0",
+    padding: 16,
+    borderRadius: 12,
     alignItems: "center",
   },
   closeButtonText: {
-    fontSize: 15,
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+  },
+  confirmOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  confirmDialog: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 24,
+    width: "100%",
+    maxWidth: 400,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  confirmTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "#1f2937",
+    marginBottom: 12,
+    textAlign: "center",
+  },
+  confirmMessage: {
+    fontSize: 16,
+    color: "#6b7280",
+    marginBottom: 24,
+    textAlign: "center",
+    lineHeight: 22,
+  },
+  confirmButtons: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: "#e5e7eb",
+    padding: 16,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  cancelButtonText: {
+    fontSize: 16,
     fontWeight: "600",
     color: "#374151",
+  },
+  confirmButton: {
+    flex: 1,
+    backgroundColor: "#EF4444",
+    padding: 16,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+  confirmButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#fff",
   },
 });
