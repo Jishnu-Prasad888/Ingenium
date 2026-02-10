@@ -2,8 +2,8 @@
 import React, { useState } from "react";
 import { TouchableOpacity, Text, StyleSheet } from "react-native";
 import { Trash2 } from "lucide-react-native";
-import { colors } from "../theme/colors";
-import DeleteConfirmationPopup from "./DeleteConfirmationPopup";
+import { colors } from "../../theme/colors";
+import DeleteConfirmationPopup from "../DeleteConfirmationPopup";
 
 interface DeleteButtonProps {
   onDelete: () => Promise<boolean> | boolean;

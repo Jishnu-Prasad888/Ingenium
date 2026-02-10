@@ -1,5 +1,5 @@
 // screens/NotesListScreen.tsx
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   ScrollView,
@@ -14,14 +14,21 @@ import SearchBar from "../components/SearchBar";
 import SortControl from "../components/SortControl";
 import NoteCard from "../components/NoteCard";
 import Divider from "../components/Divider";
-import ScrollToTopButton from "../components/ScrollToTopButton";
+import ScrollToTopButton from "../components/buttons/ScrollToTopButton";
 import { colors } from "../theme/colors";
 import { EmptyNotesState } from "../components/EmptyNotesState";
+import NotesListScreenAllButtons from "../components/buttons/NotesListScreenAllButtons";
 
 const NotesListScreen: React.FC = () => {
-  const { notes, createNote, getFilteredAndSortedItems, queryNotes } = useApp();
+  const {
+    notes,
+    createNote,
+    createWhiteboard,
+    getFilteredAndSortedItems,
+    queryNotes,
+  } = useApp();
   const scrollRef = useRef<ScrollView>(null);
-
+  const [showWhiteboard, setShowWhiteboard] = useState(false);
   const allNotes = getFilteredAndSortedItems(notes, "note");
 
   return (
@@ -39,49 +46,11 @@ const NotesListScreen: React.FC = () => {
           gap: 8,
         }}
       >
-        <TouchableOpacity
-          onPress={() => createNote(null)}
-          activeOpacity={0.8}
-          style={{
-            flex: 1,
-            height: 44,
-            backgroundColor: colors.backgroundCard,
-            borderRadius: 12,
-            flexDirection: "row" as const,
-            alignItems: "center" as const,
-            justifyContent: "center" as const,
-            paddingHorizontal: 14,
-
-            // Subtle depth
-            shadowColor: colors.shadow,
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.08,
-            shadowRadius: 3,
-            elevation: 1,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 16,
-              fontWeight: "500",
-              color: colors.text,
-              marginRight: 7,
-            }}
-          >
-            Create a new note
-          </Text>
-
-          <Plus size={20} color={colors.primary} />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.button}
-          onPress={queryNotes}
-          activeOpacity={0.8}
-        >
-          <Brain size={20} color={colors.primary} />
-          <Text style={styles.text}>Aivya</Text>
-        </TouchableOpacity>
+        <NotesListScreenAllButtons
+          createNote={createNote}
+          queryNotes={queryNotes}
+          createWhiteboard={createWhiteboard}
+        />
       </View>
 
       <Divider text="Your notes here" />

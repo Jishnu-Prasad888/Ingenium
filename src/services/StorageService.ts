@@ -1,5 +1,5 @@
 // services/StorageService.ts
-import DatabaseService from './DatabaseService';
+import DatabaseService from "./DatabaseService";
 
 export interface Folder {
   id: string;
@@ -10,6 +10,7 @@ export interface Folder {
   syncStatus: string;
 }
 
+// services/StorageService.ts (Note interface)
 export interface Note {
   id: string;
   folderId: string | null;
@@ -17,7 +18,8 @@ export interface Note {
   content: string;
   createdAt: number;
   updatedAt: number;
-  syncStatus: string;
+  syncStatus: "pending" | "synced";
+  type?: "text" | "whiteboard";
 }
 
 class StorageService {
@@ -37,12 +39,12 @@ class StorageService {
 
     this.initializationPromise = (async () => {
       try {
-        console.log('Initializing StorageService...');
+        console.log("Initializing StorageService...");
         await DatabaseService.init();
         this.initialized = true;
-        console.log('StorageService initialized successfully');
+        console.log("StorageService initialized successfully");
       } catch (error) {
-        console.error('StorageService initialization failed:', error);
+        console.error("StorageService initialization failed:", error);
         this.initialized = false;
         this.initializationPromise = null;
         throw error;
@@ -57,7 +59,7 @@ class StorageService {
     try {
       await DatabaseService.flush();
     } catch (error) {
-      console.error('Error ensuring data is saved:', error);
+      console.error("Error ensuring data is saved:", error);
     }
   }
 
@@ -66,7 +68,7 @@ class StorageService {
       await this.initialize();
       return await DatabaseService.getFolders();
     } catch (error) {
-      console.error('Error getting folders:', error);
+      console.error("Error getting folders:", error);
       return [];
     }
   }
@@ -76,7 +78,7 @@ class StorageService {
       await this.initialize();
       return await DatabaseService.getNotes();
     } catch (error) {
-      console.error('Error getting notes:', error);
+      console.error("Error getting notes:", error);
       return [];
     }
   }
@@ -86,7 +88,7 @@ class StorageService {
       await this.initialize();
       await DatabaseService.saveFolder(folder);
     } catch (error) {
-      console.error('Error saving folder:', error);
+      console.error("Error saving folder:", error);
       throw error;
     }
   }
@@ -96,7 +98,7 @@ class StorageService {
       await this.initialize();
       await DatabaseService.saveNote(note);
     } catch (error) {
-      console.error('Error saving note:', error);
+      console.error("Error saving note:", error);
       throw error;
     }
   }
@@ -106,7 +108,7 @@ class StorageService {
       await this.initialize();
       await DatabaseService.deleteFolder(id);
     } catch (error) {
-      console.error('Error deleting folder:', error);
+      console.error("Error deleting folder:", error);
       throw error;
     }
   }
@@ -116,7 +118,7 @@ class StorageService {
       await this.initialize();
       await DatabaseService.deleteNote(id);
     } catch (error) {
-      console.error('Error deleting note:', error);
+      console.error("Error deleting note:", error);
       throw error;
     }
   }
@@ -126,7 +128,7 @@ class StorageService {
       await this.initialize();
       return await DatabaseService.getNoteById(id);
     } catch (error) {
-      console.error('Error getting note by ID:', error);
+      console.error("Error getting note by ID:", error);
       return null;
     }
   }
@@ -136,9 +138,9 @@ class StorageService {
     try {
       await this.initialize();
       const notes = await DatabaseService.getNotes();
-      return notes.filter(note => note.folderId === folderId);
+      return notes.filter((note) => note.folderId === folderId);
     } catch (error) {
-      console.error('Error getting notes by folder ID:', error);
+      console.error("Error getting notes by folder ID:", error);
       return [];
     }
   }
@@ -148,9 +150,9 @@ class StorageService {
     try {
       await this.initialize();
       const folders = await DatabaseService.getFolders();
-      return folders.filter(folder => folder.parentId === parentId);
+      return folders.filter((folder) => folder.parentId === parentId);
     } catch (error) {
-      console.error('Error getting subfolders:', error);
+      console.error("Error getting subfolders:", error);
       return [];
     }
   }
@@ -160,9 +162,9 @@ class StorageService {
     try {
       await this.initialize();
       const folders = await DatabaseService.getFolders();
-      return folders.find(folder => folder.id === id) || null;
+      return folders.find((folder) => folder.id === id) || null;
     } catch (error) {
-      console.error('Error getting folder by ID:', error);
+      console.error("Error getting folder by ID:", error);
       return null;
     }
   }
@@ -172,22 +174,22 @@ class StorageService {
     try {
       await this.initialize();
       const folders = await DatabaseService.getFolders();
-      const folder = folders.find(f => f.id === id);
-      
+      const folder = folders.find((f) => f.id === id);
+
       if (!folder) {
         throw new Error(`Folder with id ${id} not found`);
       }
-      
+
       const updatedFolder: Folder = {
         ...folder,
         ...updates,
         updatedAt: Date.now(),
-        syncStatus: updates.syncStatus || 'pending',
+        syncStatus: updates.syncStatus || "pending",
       };
-      
+
       await DatabaseService.saveFolder(updatedFolder);
     } catch (error) {
-      console.error('Error updating folder:', error);
+      console.error("Error updating folder:", error);
       throw error;
     }
   }
@@ -197,41 +199,41 @@ class StorageService {
     try {
       await this.initialize();
       const notes = await DatabaseService.getNotes();
-      const note = notes.find(n => n.id === id);
-      
+      const note = notes.find((n) => n.id === id);
+
       if (!note) {
         throw new Error(`Note with id ${id} not found`);
       }
-      
+
       const updatedNote: Note = {
         ...note,
         ...updates,
         updatedAt: Date.now(),
-        syncStatus: updates.syncStatus || 'pending',
+        syncStatus: updates.syncStatus || "pending",
       };
-      
+
       await DatabaseService.saveNote(updatedNote);
     } catch (error) {
-      console.error('Error updating note:', error);
+      console.error("Error updating note:", error);
       throw error;
     }
   }
 
-    async getDatabaseInfo(): Promise<{
+  async getDatabaseInfo(): Promise<{
     size?: number;
     rowCounts: {
       folders: number;
       notes: number;
       pendingSync: number;
     };
-    status: 'initialized' | 'not-initialized' | 'error';
+    status: "initialized" | "not-initialized" | "error";
     lastBackup?: number;
   }> {
     try {
       if (!this.initialized) {
         return {
           rowCounts: { folders: 0, notes: 0, pendingSync: 0 },
-          status: 'not-initialized',
+          status: "not-initialized",
         };
       }
 
@@ -246,13 +248,13 @@ class StorageService {
           notes: notes.length,
           pendingSync: pendingItems.length,
         },
-        status: 'initialized',
+        status: "initialized",
       };
     } catch (error) {
-      console.error('Error getting database info:', error);
+      console.error("Error getting database info:", error);
       return {
         rowCounts: { folders: 0, notes: 0, pendingSync: 0 },
-        status: 'error',
+        status: "error",
       };
     }
   }
@@ -263,8 +265,8 @@ class StorageService {
       await this.initialize();
       return await DatabaseService.exportDatabase();
     } catch (error) {
-      console.error('Error exporting data:', error);
-      return '';
+      console.error("Error exporting data:", error);
+      return "";
     }
   }
 
@@ -273,7 +275,7 @@ class StorageService {
       await this.initialize();
       await DatabaseService.importDatabase(jsonData);
     } catch (error) {
-      console.error('Error importing data:', error);
+      console.error("Error importing data:", error);
       throw error;
     }
   }
@@ -284,7 +286,7 @@ class StorageService {
       await this.initialize();
       return await DatabaseService.getPendingSyncItems();
     } catch (error) {
-      console.error('Error getting pending sync items:', error);
+      console.error("Error getting pending sync items:", error);
       return [];
     }
   }
@@ -295,7 +297,7 @@ class StorageService {
       await this.initialize();
       await DatabaseService.clearPendingSyncItem(id);
     } catch (error) {
-      console.error('Error clearing pending sync item:', error);
+      console.error("Error clearing pending sync item:", error);
     }
   }
 
@@ -308,7 +310,7 @@ class StorageService {
         await DatabaseService.clearPendingSyncItem(item.id);
       }
     } catch (error) {
-      console.error('Error clearing all pending sync items:', error);
+      console.error("Error clearing all pending sync items:", error);
     }
   }
 
@@ -324,12 +326,13 @@ class StorageService {
       const notes = await this.getNotes();
       const folders = await this.getFolders();
       const pendingItems = await this.getPendingSyncItems();
-      
+
       // Find most recent update
       const allItems = [...notes, ...folders];
-      const lastUpdated = allItems.length > 0 
-        ? Math.max(...allItems.map(item => item.updatedAt))
-        : null;
+      const lastUpdated =
+        allItems.length > 0
+          ? Math.max(...allItems.map((item) => item.updatedAt))
+          : null;
 
       return {
         totalNotes: notes.length,
@@ -338,7 +341,7 @@ class StorageService {
         lastUpdated,
       };
     } catch (error) {
-      console.error('Error getting database stats:', error);
+      console.error("Error getting database stats:", error);
       return {
         totalNotes: 0,
         totalFolders: 0,
@@ -357,24 +360,25 @@ class StorageService {
       await this.initialize();
       const notes = await this.getNotes();
       const folders = await this.getFolders();
-      
+
       const searchLower = query.toLowerCase().trim();
-      
-      const filteredNotes = notes.filter(note => 
-        note.title.toLowerCase().includes(searchLower) ||
-        note.content.toLowerCase().includes(searchLower)
+
+      const filteredNotes = notes.filter(
+        (note) =>
+          note.title.toLowerCase().includes(searchLower) ||
+          note.content.toLowerCase().includes(searchLower),
       );
-      
-      const filteredFolders = folders.filter(folder =>
-        folder.name.toLowerCase().includes(searchLower)
+
+      const filteredFolders = folders.filter((folder) =>
+        folder.name.toLowerCase().includes(searchLower),
       );
-      
+
       return {
         notes: filteredNotes,
         folders: filteredFolders,
       };
     } catch (error) {
-      console.error('Error searching:', error);
+      console.error("Error searching:", error);
       return { notes: [], folders: [] };
     }
   }
@@ -389,30 +393,29 @@ class StorageService {
     try {
       // Note: This doesn't delete the database file, just clears data
       // For Expo, we would need a different approach to delete the file
-      console.warn('Reset method not fully implemented for Expo SQLite');
-      
+      console.warn("Reset method not fully implemented for Expo SQLite");
+
       // Clear all data from tables
       await this.initialize();
-      
+
       // This is a workaround - in production you might want to handle this differently
       const notes = await this.getNotes();
       const folders = await this.getFolders();
-      
+
       // Delete all notes
       for (const note of notes) {
         await this.deleteNote(note.id);
       }
-      
+
       // Delete all folders
       for (const folder of folders) {
         await this.deleteFolder(folder.id);
       }
-      
+
       // Clear pending sync
       await this.clearAllPendingSyncItems();
-      
     } catch (error) {
-      console.error('Error resetting storage:', error);
+      console.error("Error resetting storage:", error);
     }
   }
 
@@ -423,7 +426,7 @@ class StorageService {
       this.initialized = false;
       this.initializationPromise = null;
     } catch (error) {
-      console.error('Error closing storage:', error);
+      console.error("Error closing storage:", error);
     }
   }
 }
