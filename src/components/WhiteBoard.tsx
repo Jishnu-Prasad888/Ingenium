@@ -154,6 +154,10 @@ export default function Whiteboard() {
     setMenuOpen(false);
   };
 
+  const toggleTool = () => {
+    setIsEraser(!isEraser);
+  };
+
   const handleClearAll = () => {
     setStrokes([]);
     setMenuOpen(false);
@@ -196,22 +200,33 @@ export default function Whiteboard() {
             </View>
           </TouchableOpacity>
 
-          {/* Current Tool Indicator */}
-          <View style={styles.toolIndicator}>
+          {/* Current Tool Indicator - Now Clickable */}
+          <TouchableOpacity
+            style={styles.toolIndicator}
+            onPress={toggleTool}
+            activeOpacity={0.7}
+          >
             {isEraser ? (
-              <Text style={styles.toolText}>✏️ Eraser</Text>
+              <View style={styles.toolContent}>
+                <Text style={styles.toolEmoji}>🧹</Text>
+                <Text style={styles.toolText}>Eraser</Text>
+              </View>
             ) : (
-              <View style={styles.colorIndicatorContainer}>
-                <View
-                  style={[
-                    styles.colorIndicator,
-                    { backgroundColor: currentColor },
-                  ]}
-                />
+              <View style={styles.toolContent}>
+                <View style={styles.penIndicator}>
+                  <View
+                    style={[
+                      styles.colorIndicator,
+                      { backgroundColor: currentColor },
+                    ]}
+                  />
+                  <Text style={styles.toolEmoji}>✏️</Text>
+                </View>
                 <Text style={styles.toolText}>Pen</Text>
               </View>
             )}
-          </View>
+            <Text style={styles.tapHint}>Tap to switch</Text>
+          </TouchableOpacity>
 
           {/* Menu Modal */}
           <Modal
@@ -257,7 +272,14 @@ export default function Whiteboard() {
                   style={[styles.toolButton, isEraser && styles.selectedTool]}
                   onPress={handleEraserSelect}
                 >
-                  <Text style={styles.toolButtonText}>✏️ Eraser</Text>
+                  <Text
+                    style={[
+                      styles.toolButtonText,
+                      isEraser && styles.selectedToolText,
+                    ]}
+                  >
+                    🧹 Eraser
+                  </Text>
                 </TouchableOpacity>
 
                 {/* Clear All */}
@@ -287,148 +309,187 @@ export default function Whiteboard() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#fff",
+    backgroundColor: "#FAFAFA",
   },
+
+  /* Floating menu button */
   menuButton: {
     position: "absolute",
     top: 16,
     left: 16,
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#000",
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    backgroundColor: "#FFFFFF",
     justifyContent: "center",
     alignItems: "center",
     zIndex: 1000,
-    elevation: 5,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 6,
   },
   menuIcon: {
-    width: 24,
-    height: 18,
+    width: 18,
+    height: 14,
     justifyContent: "space-between",
   },
   menuLine: {
     width: "100%",
-    height: 3,
-    backgroundColor: "#fff",
+    height: 2,
+    backgroundColor: "#111827",
     borderRadius: 2,
   },
+
+  /* Tool indicator */
   toolIndicator: {
     position: "absolute",
     top: 16,
     right: 16,
-    backgroundColor: "rgba(0,0,0,0.8)",
+    backgroundColor: "#FFFFFF",
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingVertical: 12,
+    borderRadius: 16,
     zIndex: 1000,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 6,
   },
-  colorIndicatorContainer: {
+  toolContent: {
+    alignItems: "center",
+  },
+  penIndicator: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
+    marginBottom: 4,
   },
   colorIndicator: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: "#fff",
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.5,
+    borderColor: "#E5E7EB",
+  },
+  toolEmoji: {
+    fontSize: 18,
   },
   toolText: {
-    color: "#fff",
-    fontSize: 14,
+    color: "#111827",
+    fontSize: 13,
     fontWeight: "600",
   },
+  tapHint: {
+    color: "#9CA3AF",
+    fontSize: 10,
+    marginTop: 4,
+  },
+
+  /* Modal */
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: "rgba(0,0,0,0.35)",
     justifyContent: "flex-end",
   },
   menuContainer: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     padding: 24,
     paddingBottom: 40,
   },
   menuTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 20,
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: 24,
     textAlign: "center",
+    color: "#111827",
   },
+
+  /* Sections */
   section: {
     marginBottom: 24,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "600",
     marginBottom: 12,
-    color: "#333",
+    color: "#6B7280",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
   },
+
+  /* Color picker */
   colorGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    gap: 14,
   },
   colorButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
     borderColor: "transparent",
   },
   selectedColor: {
-    borderColor: "#000",
-    borderWidth: 3,
+    borderColor: "#111827",
   },
   checkmark: {
-    color: "#fff",
-    fontSize: 24,
-    fontWeight: "bold",
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
   },
+
+  /* Tool buttons */
   toolButton: {
-    backgroundColor: "#f0f0f0",
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: "#F3F4F6",
+    paddingVertical: 14,
+    borderRadius: 14,
     marginBottom: 12,
     alignItems: "center",
   },
   selectedTool: {
-    backgroundColor: "#000",
+    backgroundColor: "#111827",
   },
   toolButtonText: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: "600",
+    color: "#111827",
   },
+  selectedToolText: {
+    color: "#FFFFFF",
+  },
+
+  /* Destructive action */
   clearButton: {
-    backgroundColor: "#EF4444",
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: "#FEE2E2",
+    paddingVertical: 14,
+    borderRadius: 14,
     marginBottom: 12,
     alignItems: "center",
   },
   clearButtonText: {
-    color: "#fff",
-    fontSize: 18,
+    color: "#991B1B",
+    fontSize: 15,
     fontWeight: "600",
   },
+
+  /* Close */
   closeButton: {
-    backgroundColor: "#e0e0e0",
-    padding: 16,
-    borderRadius: 12,
+    backgroundColor: "#F3F4F6",
+    paddingVertical: 14,
+    borderRadius: 14,
     alignItems: "center",
   },
   closeButtonText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "600",
-    color: "#333",
+    color: "#374151",
   },
 });
