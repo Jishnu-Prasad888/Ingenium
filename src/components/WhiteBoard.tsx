@@ -6,10 +6,11 @@ import {
   TouchableOpacity,
   Modal,
   Alert,
+  Platform,
 } from "react-native";
 import Svg, { Path, G } from "react-native-svg";
+import * as FileSystem from "expo-file-system/legacy";
 import { SafeAreaView } from "react-native-safe-area-context";
-import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import * as DocumentPicker from "expo-document-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -260,74 +261,56 @@ export default function Whiteboard() {
   // Export to file and share to apps (WhatsApp, email, etc.)
   const handleExport = async () => {
     try {
-      const state: WhiteboardState = {
+      const state = {
         strokes,
         scale,
         translateX,
         translateY,
       };
 
-      const jsonContent = JSON.stringify(state, null, 2);
-      const filename = `whiteboard_${new Date().getTime()}.json`;
+      const json = JSON.stringify(state, null, 2);
+      const filename = `whiteboard_${Date.now()}.json`;
 
-      // Try to get a filesystem directory
-      const fs = FileSystem as any;
-      let directory = fs.cacheDirectory || fs.documentDirectory;
+      // ANDROID: SAF - Type-safe access
+      if (Platform.OS === "android") {
+        // Check if StorageAccessFramework exists (it should in recent versions)
+        const SAF = (FileSystem as any).StorageAccessFramework;
 
-      if (!directory) {
-        // Fallback for Expo Go or web: Show data and allow manual save
-        Alert.alert(
-          "Export Whiteboard",
-          "File system not available in this environment. Copy the data below and save it manually to a .json file.",
-          [
-            {
-              text: "Show Data",
-              onPress: () => {
-                console.log("Whiteboard Data:", jsonContent);
-                Alert.alert(
-                  "Whiteboard Data",
-                  `Data logged to console. Check developer console to copy full data.\n\nPreview:\n${jsonContent.substring(0, 200)}...`,
-                  [{ text: "OK" }],
-                );
-              },
-            },
-            { text: "Cancel", style: "cancel" },
-          ],
-        );
-        setMenuOpen(false);
-        return;
+        if (SAF && typeof SAF.requestDirectoryPermissionsAsync === "function") {
+          const permission = await SAF.requestDirectoryPermissionsAsync();
+
+          if (!permission.granted) return;
+
+          const uri = await SAF.createFileAsync(
+            permission.directoryUri,
+            filename,
+            "application/json",
+          );
+
+          await FileSystem.writeAsStringAsync(uri, json);
+
+          Alert.alert("Exported", "Saved successfully");
+          return;
+        }
       }
 
-      const fileUri = directory + filename;
+      // FALLBACK (older Expo / iOS) - Type-safe access
+      const docDirectory = FileSystem.documentDirectory;
+      if (!docDirectory) {
+        throw new Error("Document directory not available");
+      }
 
-      // Write file to filesystem
-      await FileSystem.writeAsStringAsync(fileUri, jsonContent);
+      const uri = docDirectory + filename;
+      await FileSystem.writeAsStringAsync(uri, json);
 
-      // Share the file to various apps (WhatsApp, Email, Files, etc.)
+      // Share the file on iOS or if SAF is not available
       if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(fileUri, {
-          mimeType: "application/json",
-          dialogTitle: "Share Whiteboard",
-          UTI: "public.json",
-        });
-
-        // Success message after sharing
-        setMenuOpen(false);
+        await Sharing.shareAsync(uri);
       } else {
-        // If sharing is not available, just show success
-        Alert.alert(
-          "Exported Successfully",
-          `Whiteboard saved to:\n${fileUri}\n\nYou can find it in your device's file manager.`,
-          [{ text: "OK" }],
-        );
-        setMenuOpen(false);
+        Alert.alert("Exported", `Saved to ${uri}`);
       }
-    } catch (error) {
-      Alert.alert(
-        "Export Error",
-        `Failed to export whiteboard.\n\nError: ${(error as Error).message}\n\nTip: If using Expo Go, try building a standalone app for full file system access.`,
-      );
-      console.error("Export error:", error);
+    } catch (e: any) {
+      Alert.alert("Export error", e.message);
     }
   };
 
@@ -339,44 +322,39 @@ export default function Whiteboard() {
         copyToCacheDirectory: true,
       });
 
-      // Handle both old and new DocumentPicker API
-      if (
-        "canceled" in result &&
-        !result.canceled &&
-        result.assets &&
-        result.assets.length > 0
-      ) {
-        // New API (Expo SDK 48+)
-        const asset = result.assets[0];
-        const content = await FileSystem.readAsStringAsync(asset.uri);
-        const state: WhiteboardState = JSON.parse(content);
+      if (result.canceled) return;
 
-        setStrokes(state.strokes);
-        setScale(state.scale);
-        setTranslateX(state.translateX);
-        setTranslateY(state.translateY);
+      let uri: string | undefined;
 
-        Alert.alert("Success", "Whiteboard loaded successfully!");
-      } else if ("type" in result && result.type === "success") {
-        // Old API (Expo SDK < 48)
-        const content = await FileSystem.readAsStringAsync((result as any).uri);
-        const state: WhiteboardState = JSON.parse(content);
-
-        setStrokes(state.strokes);
-        setScale(state.scale);
-        setTranslateX(state.translateX);
-        setTranslateY(state.translateY);
-
-        Alert.alert("Success", "Whiteboard loaded successfully!");
+      // New API (SDK 48+)
+      if (result.assets && result.assets.length > 0) {
+        uri = result.assets[0].uri;
       }
 
+      if (!uri) throw new Error("No file selected");
+
+      const content = await FileSystem.readAsStringAsync(uri);
+      const parsed = JSON.parse(content);
+
+      // Validation
+      if (
+        !parsed ||
+        !Array.isArray(parsed.strokes) ||
+        typeof parsed.scale !== "number"
+      ) {
+        throw new Error("Invalid whiteboard file");
+      }
+
+      setStrokes(parsed.strokes);
+      setScale(parsed.scale);
+      setTranslateX(parsed.translateX ?? 0);
+      setTranslateY(parsed.translateY ?? 0);
+
+      Alert.alert("Success", "Whiteboard loaded successfully.");
       setMenuOpen(false);
     } catch (error) {
-      Alert.alert(
-        "Import Error",
-        `Failed to import whiteboard.\n\nError: ${(error as Error).message}`,
-      );
-      console.error("Import error:", error);
+      Alert.alert("Import Error", (error as Error).message);
+      console.error(error);
     }
   };
 
