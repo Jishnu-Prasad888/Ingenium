@@ -18,6 +18,7 @@ import ScrollToTopButton from "../components/buttons/ScrollToTopButton";
 import { colors } from "../theme/colors";
 import { EmptyNotesState } from "../components/EmptyNotesState";
 import NotesListScreenAllButtons from "../components/buttons/NotesListScreenAllButtons";
+import BurgerMenu from "../components/BurgeMenu";
 
 const NotesListScreen: React.FC = () => {
   const {
@@ -67,6 +68,7 @@ const NotesListScreen: React.FC = () => {
       )}
 
       <ScrollToTopButton scrollRef={scrollRef} />
+      <BurgerMenu />
     </View>
   );
 };
