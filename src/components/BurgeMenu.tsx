@@ -25,7 +25,6 @@ interface DrawerProps {
   onClose: () => void;
   onItemPress: (key: string) => void;
 }
-
 const ITEMS = [
   { key: "timer", label: "Timer", icon: Timer },
   { key: "alarm", label: "Alarm", icon: AlarmClock },
@@ -156,7 +155,9 @@ function Drawer({ open, onClose, onItemPress }: DrawerProps) {
           useNativeDriver: true,
         }),
       ]).start(({ finished }) => {
-        if (finished) setMounted(false);
+        if (finished) {
+          setMounted(false);
+        }
       });
     }
   }, [open]);
@@ -176,16 +177,6 @@ function Drawer({ open, onClose, onItemPress }: DrawerProps) {
 
       <Animated.View style={[d.panel, { transform: [{ translateX: slideX }] }]}>
         <SafeAreaView edges={["top", "left", "bottom"]} style={d.panelInner}>
-          <View style={d.brand}>
-            <View style={d.brandIcon}>
-              <Clock size={22} color={COLORS.dark} />
-            </View>
-            <View>
-              <Text style={d.brandName}>Clocky</Text>
-              <Text style={d.brandSub}>Your time, your way</Text>
-            </View>
-          </View>
-
           <View style={d.divider} />
 
           <View style={d.navList}>
@@ -381,18 +372,15 @@ export default function BurgerMenu() {
   };
 
   const handleItemPress = (key: string) => {
+    setDrawerOpen(false);
+
     if (key === "timer") {
-      // Close drawer and open timer modal immediately
-      setDrawerOpen(false);
-      if (key === "timer") {
-        // Wait for drawer close animation to finish (matches your 200ms duration)
-        setTimeout(() => setTimerOpen(true), 200);
-      }
-      setTimerOpen(true);
-    } else {
-      setDrawerOpen(false);
+      setTimeout(() => {
+        setTimerOpen(true);
+      }, 250); // match drawer close animation duration
     }
   };
+
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
       <SafeAreaView

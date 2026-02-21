@@ -45,12 +45,10 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
     new Animated.Value(1),
     new Animated.Value(1),
   ]).current;
-  const [mounted, setMounted] = useState(false);
 
   // Open / close
   useEffect(() => {
     if (visible) {
-      setMounted(true);
       slideAnim.setValue(height + 200);
       Animated.parallel([
         Animated.spring(slideAnim, {
@@ -80,7 +78,6 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
         }),
       ]).start(({ finished }) => {
         if (finished) {
-          setMounted(false);
           setRunning(false);
           setSeconds(0);
         }
@@ -90,7 +87,7 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
 
   // Re-snap sheet to 0 after rotation so it never drifts off-screen
   useEffect(() => {
-    if (visible && mounted) {
+    if (visible) {
       Animated.spring(slideAnim, {
         toValue: 0,
         useNativeDriver: true,
@@ -195,12 +192,10 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
 
   const statusLabel = running ? "Running" : seconds > 0 ? "Paused" : "Ready";
 
-  if (!mounted) return null;
-
   return (
     <Modal
       transparent
-      visible={mounted}
+      visible={visible}
       animationType="none"
       onRequestClose={onClose}
       statusBarTranslucent
