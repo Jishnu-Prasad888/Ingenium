@@ -9,6 +9,7 @@ import {
   Animated,
   useWindowDimensions,
   StatusBar,
+  Easing,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Play, Pause, RotateCcw, X } from "lucide-react-native";
@@ -27,8 +28,168 @@ const C = {
   accentLight: "#f5c4b4",
   muted: "rgba(42,21,16,0.35)",
   overlay: "rgba(42,21,16,0.6)",
-  cardBg: "#FEF0E4",
 };
+
+// ── Snowflake config ──────────────────────────────────────────────
+const FLAKE_COUNT = 28;
+
+interface Flake {
+  x: Animated.Value; // horizontal drift (0..1 of width)
+  y: Animated.Value; // vertical position (0..1 of height)
+  opacity: Animated.Value;
+  size: number;
+  duration: number;
+  delay: number;
+  drift: number; // horizontal sway range as fraction of width
+  startX: number; // initial x fraction
+}
+
+function makeFlakes(): Flake[] {
+  return Array.from({ length: FLAKE_COUNT }, () => {
+    const size = 4 + Math.random() * 7; // 4–11 px diameter
+    const duration = 6000 + Math.random() * 8000; // 6–14 s fall
+    const delay = Math.random() * 10000; // stagger start up to 10 s
+    const startX = Math.random();
+    const drift = 0.04 + Math.random() * 0.06; // gentle sway
+    return {
+      x: new Animated.Value(startX),
+      y: new Animated.Value(-0.05),
+      opacity: new Animated.Value(0),
+      size,
+      duration,
+      delay,
+      drift,
+      startX,
+    };
+  });
+}
+
+function animateFlake(flake: Flake, screenWidth: number, screenHeight: number) {
+  // Reset
+  flake.y.setValue(-0.05);
+  flake.x.setValue(flake.startX);
+  flake.opacity.setValue(0);
+
+  // Horizontal sway: oscillate around startX
+  const swayDuration = 2500 + Math.random() * 2000;
+  const targetX = flake.startX + (Math.random() > 0.5 ? 1 : -1) * flake.drift;
+
+  const sway = Animated.loop(
+    Animated.sequence([
+      Animated.timing(flake.x, {
+        toValue: Math.max(0, Math.min(1, targetX)),
+        duration: swayDuration,
+        easing: Easing.inOut(Easing.sin),
+        useNativeDriver: true,
+      }),
+      Animated.timing(flake.x, {
+        toValue: flake.startX,
+        duration: swayDuration,
+        easing: Easing.inOut(Easing.sin),
+        useNativeDriver: true,
+      }),
+    ]),
+  );
+
+  // Fall + fade in/out
+  const fall = Animated.sequence([
+    Animated.delay(flake.delay),
+    Animated.parallel([
+      // fade in over first 15% of fall
+      Animated.sequence([
+        Animated.timing(flake.opacity, {
+          toValue: 0.55 + Math.random() * 0.3,
+          duration: flake.duration * 0.15,
+          useNativeDriver: true,
+        }),
+        // hold
+        Animated.timing(flake.opacity, {
+          toValue: 0.55 + Math.random() * 0.3,
+          duration: flake.duration * 0.7,
+          useNativeDriver: true,
+        }),
+        // fade out last 15%
+        Animated.timing(flake.opacity, {
+          toValue: 0,
+          duration: flake.duration * 0.15,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.timing(flake.y, {
+        toValue: 1.05,
+        duration: flake.duration,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      }),
+    ]),
+  ]);
+
+  sway.start();
+  fall.start(({ finished }) => {
+    if (finished) {
+      sway.stop();
+      // Loop with a fresh random delay
+      flake.delay = Math.random() * 4000;
+      flake.startX = Math.random();
+      animateFlake(flake, screenWidth, screenHeight);
+    }
+  });
+}
+
+interface SnowProps {
+  width: number;
+  height: number;
+}
+
+function Snow({ width, height }: SnowProps) {
+  const flakesRef = useRef<Flake[]>(makeFlakes());
+
+  useEffect(() => {
+    const flakes = flakesRef.current;
+    flakes.forEach((f) => animateFlake(f, width, height));
+    return () => {
+      // Stop all on unmount
+      flakes.forEach((f) => {
+        f.y.stopAnimation();
+        f.x.stopAnimation();
+        f.opacity.stopAnimation();
+      });
+    };
+  }, []);
+
+  return (
+    <View style={StyleSheet.absoluteFill} pointerEvents="none">
+      {flakesRef.current.map((flake, i) => {
+        const translateY = flake.y.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, height],
+        });
+        const translateX = flake.x.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, width],
+        });
+        return (
+          <Animated.View
+            key={i}
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              width: flake.size,
+              height: flake.size,
+              borderRadius: flake.size / 2,
+              backgroundColor: C.peachMid,
+              opacity: flake.opacity,
+              transform: [{ translateX }, { translateY }],
+            }}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────
 
 export default function TimerModal({ visible, onClose }: TimerModalProps) {
   const { width, height } = useWindowDimensions();
@@ -116,7 +277,6 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
 
   useEffect(() => {
     if (running) {
-      // Gentle breathe on the whole display
       const breathe = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
@@ -131,17 +291,13 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
           }),
         ]),
       );
-      // Subtle glow fade in
-      const glow = Animated.timing(glowAnim, {
+      breathe.start();
+      Animated.timing(glowAnim, {
         toValue: 1,
         duration: 400,
         useNativeDriver: true,
-      });
-      breathe.start();
-      glow.start();
-      return () => {
-        breathe.stop();
-      };
+      }).start();
+      return () => breathe.stop();
     } else {
       Animated.spring(pulseAnim, {
         toValue: 1,
@@ -202,7 +358,6 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
   const iconSize = isLandscape ? 18 : 21;
   const statusLabel = running ? "Running" : seconds > 0 ? "Paused" : "Ready";
 
-  // Font size scales with screen
   const digitFontSize = isLandscape
     ? Math.min(height * 0.22, 56)
     : Math.min(width * 0.155, 64);
@@ -242,6 +397,9 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
       <Animated.View
         style={[s.sheet, { transform: [{ translateY: slideAnim }] }]}
       >
+        {/* Snow lives inside the sheet so it's clipped to the modal */}
+        <Snow width={width} height={height} />
+
         <SafeAreaView
           edges={["top", "bottom", "left", "right"]}
           style={s.safeArea}
@@ -267,15 +425,13 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
           <View
             style={[s.body, isLandscape ? s.bodyLandscape : s.bodyPortrait]}
           >
-            {/* ── Time display card ── */}
+            {/* Time display card */}
             <Animated.View
               style={[s.card, { transform: [{ scale: pulseAnim }] }]}
             >
-              {/* Running glow overlay */}
               <Animated.View style={[s.cardGlow, { opacity: glowOpacity }]} />
 
               <View style={s.timeRow}>
-                {/* Hours */}
                 <View style={s.unit}>
                   <Text style={[s.digit, { fontSize: digitFontSize }]}>
                     {pad(hrs)}
@@ -287,7 +443,6 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
                   :
                 </Text>
 
-                {/* Minutes */}
                 <View style={s.unit}>
                   <Text style={[s.digit, { fontSize: digitFontSize }]}>
                     {pad(mins)}
@@ -299,7 +454,6 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
                   :
                 </Text>
 
-                {/* Seconds */}
                 <View style={s.unit}>
                   <Text
                     style={[
@@ -317,7 +471,7 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
               </View>
             </Animated.View>
 
-            {/* ── Controls ── */}
+            {/* Controls */}
             <View
               style={[
                 s.controls,
@@ -412,7 +566,6 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
                 </Animated.View>
               </View>
 
-              {/* Status pill */}
               <View style={[s.statusPill, running && s.statusPillActive]}>
                 <View style={[s.statusDot, running && s.statusDotActive]} />
                 <Text style={[s.statusText, running && s.statusTextActive]}>
@@ -436,6 +589,7 @@ const s = StyleSheet.create({
     right: 0,
     bottom: 0,
     backgroundColor: C.bg,
+    overflow: "hidden",
     shadowColor: C.dark,
     shadowOffset: { width: 0, height: -8 },
     shadowOpacity: 0.18,
@@ -504,7 +658,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 36,
   },
 
-  // Card
   card: {
     backgroundColor: C.peach,
     borderRadius: 32,
@@ -523,16 +676,8 @@ const s = StyleSheet.create({
     backgroundColor: C.accent,
     borderRadius: 32,
   },
-  timeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  unit: {
-    alignItems: "center",
-    gap: 8,
-    minWidth: 72,
-  },
+  timeRow: { flexDirection: "row", alignItems: "center", gap: 4 },
+  unit: { alignItems: "center", gap: 8, minWidth: 72 },
   digit: {
     fontFamily: "Georgia",
     fontWeight: "600",
@@ -540,10 +685,7 @@ const s = StyleSheet.create({
     letterSpacing: -1.5,
     opacity: 0.88,
   },
-  digitRunning: {
-    opacity: 1,
-    color: C.accent,
-  },
+  digitRunning: { opacity: 1, color: C.accent },
   unitLabel: {
     fontFamily: "Georgia",
     fontSize: 9,
@@ -552,10 +694,7 @@ const s = StyleSheet.create({
     opacity: 0.3,
     textTransform: "uppercase",
   },
-  unitLabelRunning: {
-    color: C.accent,
-    opacity: 0.65,
-  },
+  unitLabelRunning: { color: C.accent, opacity: 0.65 },
   sep: {
     fontFamily: "Georgia",
     fontWeight: "200",
@@ -564,7 +703,6 @@ const s = StyleSheet.create({
     opacity: 0.7,
   },
 
-  // Controls
   controls: { alignItems: "center" },
   controlsPortrait: { gap: 14 },
   controlsLandscape: { gap: 14, justifyContent: "center" },
