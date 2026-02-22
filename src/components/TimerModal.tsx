@@ -47,40 +47,40 @@ const LIGHT = {
 };
 
 const DARK = {
-  bg: "#15121C",
-  sheet: "#15121C",
+  bg: "#17130F",
+  sheet: "#17130F",
 
-  card: "#1E1828",
-  cardGlow: "#FF9BD2",
+  card: "#221B14",
+  cardGlow: "#FF9F43",
 
-  dark: "#F6F0FF",
+  dark: "#FFF4EA",
 
-  peach: "#241D33",
-  peachMid: "#2C2440",
+  peach: "#2A2118",
+  peachMid: "#33281D",
 
-  accent: "#FF9BD2",
-  accentLight: "#FFC2E6",
+  accent: "#A3FF12",
+  accentLight: "#C8FF6A",
 
-  muted: "rgba(246,240,255,0.35)",
+  muted: "rgba(255,244,234,0.35)",
   overlay: "rgba(0,0,0,0.65)",
 
-  divider: "#2C2440",
-  handle: "#342B4D",
+  divider: "#33281D",
+  handle: "#3C2F22",
 
-  titleOp: 0.6,
-  digitOp: 0.95,
+  titleOp: 0.65,
+  digitOp: 1,
 
-  sepColor: "#3A2F59",
-  btnGhost: "#3A2F59",
+  sepColor: "#463726",
+  btnGhost: "#463726",
 
-  statusBg: "#241D33",
-  statusActive: "#FF9BD2",
+  statusBg: "#2A2118",
+  statusActive: "#A3FF12",
 
-  themeBtnBg: "#241D33",
-  themeBtnIcon: "#F6F0FF",
+  themeBtnBg: "#2A2118",
+  themeBtnIcon: "#FFF4EA",
 
-  snow: "#3A2F59",
-  labelOp: 0.5,
+  snow: "#463726",
+  labelOp: 0.55,
 };
 
 type Theme = typeof LIGHT;
