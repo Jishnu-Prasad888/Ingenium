@@ -29,12 +29,7 @@ interface DrawerProps {
   onClosed?: () => void;
 }
 
-const ITEMS = [
-  { key: "timer", label: "Timer", icon: Timer },
-  { key: "alarm", label: "Alarm", icon: AlarmClock },
-  { key: "stopwatch", label: "Stopwatch", icon: Clock },
-  { key: "settings", label: "Settings", icon: Settings },
-];
+const ITEMS = [{ key: "timer", label: "Timer", icon: Timer }];
 
 interface BurgerIconProps {
   open: boolean;
@@ -218,7 +213,11 @@ function Drawer({ open, onClose, onItemPress, onClosed }: DrawerProps) {
               return (
                 <Animated.View
                   key={item.key}
-                  style={{ transform: [{ scale }, { translateX }], opacity }}
+                  style={{
+                    transform: [{ scale }, { translateX }],
+                    opacity,
+                    width: "100%",
+                  }}
                 >
                   <TouchableOpacity
                     style={d.navItem}
@@ -272,7 +271,7 @@ const d = StyleSheet.create({
     marginHorizontal: 22,
     marginBottom: 14,
   },
-  navList: { flex: 1, paddingHorizontal: 12, gap: 2 },
+  navList: { flex: 1, paddingHorizontal: 12, gap: 2, width: "100%" },
   navItem: {
     flexDirection: "row",
     alignItems: "center",
@@ -280,6 +279,7 @@ const d = StyleSheet.create({
     paddingHorizontal: 12,
     borderRadius: 16,
     gap: 14,
+    width: "100%",
   },
   navIconWrap: {
     width: 40,
