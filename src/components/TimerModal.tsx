@@ -27,6 +27,7 @@ const C = {
   accentLight: "#f5c4b4",
   muted: "rgba(42,21,16,0.35)",
   overlay: "rgba(42,21,16,0.6)",
+  cardBg: "#FEF0E4",
 };
 
 export default function TimerModal({ visible, onClose }: TimerModalProps) {
@@ -37,35 +38,28 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
   const [running, setRunning] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // FIX 1: Initialize slideAnim to a large offscreen value, not height (which may be 0 at mount)
   const slideAnim = useRef(new Animated.Value(1200)).current;
   const backdropAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  const glowAnim = useRef(new Animated.Value(0)).current;
   const btnScales = useRef([
     new Animated.Value(1),
     new Animated.Value(1),
     new Animated.Value(1),
   ]).current;
 
-  // FIX 2: Track whether we're currently open to prevent the rotation snap
-  //        effect from fighting an in-progress open/close animation.
   const isOpenRef = useRef(false);
   const openAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
-  // Open / close
   useEffect(() => {
-    // Cancel any in-flight animation before starting a new one
     if (openAnimRef.current) {
       openAnimRef.current.stop();
       openAnimRef.current = null;
     }
-
     if (visible) {
       isOpenRef.current = true;
-      // FIX 3: Always reset both values before opening so re-opens are clean
       slideAnim.setValue(height + 200);
-      backdropAnim.setValue(0); // explicit reset prevents mid-value stuck state
-
+      backdropAnim.setValue(0);
       const anim = Animated.parallel([
         Animated.spring(slideAnim, {
           toValue: 0,
@@ -102,16 +96,13 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
         openAnimRef.current = null;
         if (finished) {
           isOpenRef.current = false;
-          // FIX 4: Stop timer state after animation fully completes to avoid
-          //        the interval cleanup racing with the close animation callback
           setRunning(false);
           setSeconds(0);
         }
       });
     }
-  }, [visible]); // FIX 5: Remove height from deps — we read it at call time, not re-trigger
+  }, [visible]);
 
-  // FIX 6: Re-snap sheet on rotation ONLY when it is already open and not animating
   useEffect(() => {
     if (isOpenRef.current && !openAnimRef.current) {
       Animated.spring(slideAnim, {
@@ -123,25 +114,34 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
     }
   }, [width, height]);
 
-  // Pulse while running
   useEffect(() => {
     if (running) {
-      const loop = Animated.loop(
+      // Gentle breathe on the whole display
+      const breathe = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
-            toValue: 1.028,
-            duration: 900,
+            toValue: 1.018,
+            duration: 1000,
             useNativeDriver: true,
           }),
           Animated.timing(pulseAnim, {
             toValue: 1,
-            duration: 900,
+            duration: 1000,
             useNativeDriver: true,
           }),
         ]),
       );
-      loop.start();
-      return () => loop.stop();
+      // Subtle glow fade in
+      const glow = Animated.timing(glowAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      });
+      breathe.start();
+      glow.start();
+      return () => {
+        breathe.stop();
+      };
     } else {
       Animated.spring(pulseAnim, {
         toValue: 1,
@@ -149,10 +149,14 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
         tension: 200,
         friction: 10,
       }).start();
+      Animated.timing(glowAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
     }
   }, [running]);
 
-  // Tick — FIX 7: Clear interval synchronously in cleanup, never leave dangling ref
   useEffect(() => {
     if (running) {
       intervalRef.current = setInterval(() => setSeconds((s) => s + 1), 1000);
@@ -165,19 +169,16 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
     };
   }, [running]);
 
-  // FIX 8: bouncyPress — delay the callback until after the first spring squish
-  //        so rapid taps don't fire state updates before the animation registers.
-  //        Also memoize so it doesn't recreate every render.
   const bouncyPress = useCallback((anim: Animated.Value, cb: () => void) => {
     Animated.sequence([
       Animated.spring(anim, {
-        toValue: 0.82,
+        toValue: 0.84,
         useNativeDriver: true,
         tension: 350,
         friction: 10,
       }),
       Animated.spring(anim, {
-        toValue: 1.12,
+        toValue: 1.08,
         useNativeDriver: true,
         tension: 300,
         friction: 8,
@@ -189,7 +190,6 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
         friction: 10,
       }),
     ]).start();
-    // Fire callback after first spring so the UI registers the press visually first
     requestAnimationFrame(cb);
   }, []);
 
@@ -197,32 +197,20 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
   const mins = Math.floor((seconds % 3600) / 60);
   const secs = seconds % 60;
   const pad = (n: number) => String(n).padStart(2, "0");
-  const timeStr =
-    hrs > 0
-      ? `${pad(hrs)}:${pad(mins)}:${pad(secs)}`
-      : `${pad(mins)}:${pad(secs)}`;
 
-  const clockSize = isLandscape
-    ? Math.min(height * 0.66, width * 0.34, 240)
-    : Math.min(width * 0.72, height * 0.34, 300);
-
-  const btnSize = isLandscape ? 54 : 64;
-  const iconSize = isLandscape ? 19 : 22;
-
-  const ticks = Array.from({ length: 60 }, (_, i) => i);
-
-  // FIX 9: Corrected hand angle math.
-  // A clock starting at 12 o'clock (top) maps 0 → -90°.
-  // We add 90 to the -90 offset so 0 seconds = top of clock = 0° rotation
-  // (pointing up in SVG-space = -90° in standard math, but RN rotate "0deg" = up is wrong—
-  //  React Native rotate 0deg = right, so we need -90deg for 12 o'clock = top).
-  // The previous code subtracted 90 which was already doing this correctly,
-  // but minute/hour were using fractional seconds incorrectly.
-  const secondDeg = (secs / 60) * 360 - 90;
-  const minuteDeg = ((mins + secs / 60) / 60) * 360 - 90;
-  const hourDeg = (((hrs % 12) + mins / 60 + secs / 3600) / 12) * 360 - 90;
-
+  const btnSize = isLandscape ? 52 : 60;
+  const iconSize = isLandscape ? 18 : 21;
   const statusLabel = running ? "Running" : seconds > 0 ? "Paused" : "Ready";
+
+  // Font size scales with screen
+  const digitFontSize = isLandscape
+    ? Math.min(height * 0.22, 56)
+    : Math.min(width * 0.155, 64);
+
+  const glowOpacity = glowAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0, 0.06],
+  });
 
   return (
     <Modal
@@ -245,14 +233,12 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
         barStyle="dark-content"
       />
 
-      {/* Backdrop */}
       <Animated.View style={[s.backdrop, { opacity: backdropAnim }]}>
         <TouchableWithoutFeedback onPress={onClose}>
           <View style={StyleSheet.absoluteFill} />
         </TouchableWithoutFeedback>
       </Animated.View>
 
-      {/* Sheet — fills entire screen */}
       <Animated.View
         style={[s.sheet, { transform: [{ translateY: slideAnim }] }]}
       >
@@ -260,7 +246,7 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
           edges={["top", "bottom", "left", "right"]}
           style={s.safeArea}
         >
-          {/* ── Header ── */}
+          {/* Header */}
           <View style={[s.header, isLandscape && s.headerLandscape]}>
             {!isLandscape && <View style={s.handle} />}
             <View style={s.headerRow}>
@@ -277,146 +263,61 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
 
           <View style={s.divider} />
 
-          {/* ── Body ── */}
+          {/* Body */}
           <View
             style={[s.body, isLandscape ? s.bodyLandscape : s.bodyPortrait]}
           >
-            {/* Clock face */}
+            {/* ── Time display card ── */}
             <Animated.View
-              style={[
-                s.clock,
-                {
-                  width: clockSize,
-                  height: clockSize,
-                  borderRadius: clockSize / 2,
-                  transform: [{ scale: pulseAnim }],
-                },
-              ]}
+              style={[s.card, { transform: [{ scale: pulseAnim }] }]}
             >
-              {/* Inner ring */}
-              <View
-                style={{
-                  position: "absolute",
-                  width: clockSize - 10,
-                  height: clockSize - 10,
-                  borderRadius: (clockSize - 10) / 2,
-                  borderWidth: 1,
-                  borderColor: C.peachMid,
-                  top: 5,
-                  left: 5,
-                }}
-              />
+              {/* Running glow overlay */}
+              <Animated.View style={[s.cardGlow, { opacity: glowOpacity }]} />
 
-              {/* Tick marks */}
-              {ticks.map((i) => {
-                const angle = (i / 60) * 2 * Math.PI;
-                const isMajor = i % 5 === 0;
-                const r = clockSize / 2 - (isMajor ? 16 : 10);
-                const x = clockSize / 2 + r * Math.sin(angle);
-                const y = clockSize / 2 - r * Math.cos(angle);
-                return (
-                  <View
-                    key={i}
-                    style={{
-                      position: "absolute",
-                      left: x - (isMajor ? 1.5 : 0.75),
-                      top: y - (isMajor ? 4.5 : 2),
-                      width: isMajor ? 3 : 1.5,
-                      height: isMajor ? 9 : 4,
-                      borderRadius: 2,
-                      backgroundColor: isMajor ? C.dark : C.peachMid,
-                      opacity: isMajor ? 0.8 : 0.4,
-                      transform: [{ rotate: `${(i / 60) * 360}deg` }],
-                    }}
-                  />
-                );
-              })}
+              <View style={s.timeRow}>
+                {/* Hours */}
+                <View style={s.unit}>
+                  <Text style={[s.digit, { fontSize: digitFontSize }]}>
+                    {pad(hrs)}
+                  </Text>
+                  <Text style={s.unitLabel}>HRS</Text>
+                </View>
 
-              {/* Hour hand */}
-              <View
-                style={[
-                  s.hand,
-                  {
-                    width: 4.5,
-                    height: clockSize * 0.22,
-                    left: clockSize / 2 - 2.25,
-                    top: clockSize / 2 - clockSize * 0.22,
-                    backgroundColor: C.dark,
-                    borderRadius: 3,
-                    // FIX 10: Correct pivot — translate origin to the base of the hand
-                    //         (which sits at the clock center), rotate, then undo translate.
-                    transform: [
-                      { translateY: clockSize * 0.22 },
-                      { rotate: `${hourDeg}deg` },
-                      { translateY: -(clockSize * 0.22) },
-                    ],
-                  },
-                ]}
-              />
+                <Text style={[s.sep, { fontSize: digitFontSize * 0.65 }]}>
+                  :
+                </Text>
 
-              {/* Minute hand */}
-              <View
-                style={[
-                  s.hand,
-                  {
-                    width: 3,
-                    height: clockSize * 0.31,
-                    left: clockSize / 2 - 1.5,
-                    top: clockSize / 2 - clockSize * 0.31,
-                    backgroundColor: C.dark,
-                    borderRadius: 3,
-                    transform: [
-                      { translateY: clockSize * 0.31 },
-                      { rotate: `${minuteDeg}deg` },
-                      { translateY: -(clockSize * 0.31) },
-                    ],
-                  },
-                ]}
-              />
+                {/* Minutes */}
+                <View style={s.unit}>
+                  <Text style={[s.digit, { fontSize: digitFontSize }]}>
+                    {pad(mins)}
+                  </Text>
+                  <Text style={s.unitLabel}>MIN</Text>
+                </View>
 
-              {/* Second hand */}
-              <View
-                style={[
-                  s.hand,
-                  {
-                    width: 1.5,
-                    height: clockSize * 0.38,
-                    left: clockSize / 2 - 0.75,
-                    top: clockSize / 2 - clockSize * 0.38,
-                    backgroundColor: C.accent,
-                    borderRadius: 2,
-                    transform: [
-                      { translateY: clockSize * 0.38 },
-                      { rotate: `${secondDeg}deg` },
-                      { translateY: -(clockSize * 0.38) },
-                    ],
-                  },
-                ]}
-              />
+                <Text style={[s.sep, { fontSize: digitFontSize * 0.65 }]}>
+                  :
+                </Text>
 
-              {/* Center dot */}
-              <View
-                style={[
-                  s.centerDot,
-                  { left: clockSize / 2 - 7, top: clockSize / 2 - 7 },
-                ]}
-              />
-
-              {/* Digital readout */}
-              <Text
-                style={[
-                  s.timeText,
-                  {
-                    fontSize: clockSize * 0.13,
-                    bottom: clockSize * 0.13,
-                  },
-                ]}
-              >
-                {timeStr}
-              </Text>
+                {/* Seconds */}
+                <View style={s.unit}>
+                  <Text
+                    style={[
+                      s.digit,
+                      { fontSize: digitFontSize },
+                      running && s.digitRunning,
+                    ]}
+                  >
+                    {pad(secs)}
+                  </Text>
+                  <Text style={[s.unitLabel, running && s.unitLabelRunning]}>
+                    SEC
+                  </Text>
+                </View>
+              </View>
             </Animated.View>
 
-            {/* ── Controls panel ── */}
+            {/* ── Controls ── */}
             <View
               style={[
                 s.controls,
@@ -439,7 +340,6 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
                   isLandscape ? s.btnGroupLandscape : s.btnGroupPortrait,
                 ]}
               >
-                {/* Start */}
                 <Animated.View style={{ transform: [{ scale: btnScales[0] }] }}>
                   <TouchableOpacity
                     onPress={() =>
@@ -462,7 +362,6 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
                   </TouchableOpacity>
                 </Animated.View>
 
-                {/* Pause */}
                 <Animated.View style={{ transform: [{ scale: btnScales[1] }] }}>
                   <TouchableOpacity
                     onPress={() =>
@@ -485,7 +384,6 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
                   </TouchableOpacity>
                 </Animated.View>
 
-                {/* Reset */}
                 <Animated.View style={{ transform: [{ scale: btnScales[2] }] }}>
                   <TouchableOpacity
                     onPress={() =>
@@ -530,10 +428,7 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
 }
 
 const s = StyleSheet.create({
-  backdrop: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: C.overlay,
-  },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: C.overlay },
   sheet: {
     position: "absolute",
     top: 0,
@@ -543,7 +438,7 @@ const s = StyleSheet.create({
     backgroundColor: C.bg,
     shadowColor: C.dark,
     shadowOffset: { width: 0, height: -8 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.18,
     shadowRadius: 28,
     elevation: 24,
   },
@@ -555,9 +450,7 @@ const s = StyleSheet.create({
     paddingBottom: 0,
     alignItems: "center",
   },
-  headerLandscape: {
-    paddingTop: 8,
-  },
+  headerLandscape: { paddingTop: 8 },
   handle: {
     width: 36,
     height: 4,
@@ -579,7 +472,7 @@ const s = StyleSheet.create({
     fontWeight: "700",
     color: C.dark,
     letterSpacing: 5,
-    opacity: 0.5,
+    opacity: 0.45,
   },
   closeBtn: {
     position: "absolute",
@@ -597,139 +490,135 @@ const s = StyleSheet.create({
     marginHorizontal: 24,
   },
 
-  body: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  body: { flex: 1, alignItems: "center", justifyContent: "center" },
   bodyPortrait: {
     flexDirection: "column",
-    gap: 40,
-    paddingVertical: 24,
-    paddingHorizontal: 20,
+    gap: 44,
+    paddingVertical: 28,
+    paddingHorizontal: 24,
   },
   bodyLandscape: {
     flexDirection: "row",
-    gap: 40,
-    paddingVertical: 10,
-    paddingHorizontal: 24,
+    gap: 44,
+    paddingVertical: 12,
+    paddingHorizontal: 36,
   },
 
-  hand: { position: "absolute" },
-  clock: {
+  // Card
+  card: {
     backgroundColor: C.peach,
-    shadowColor: C.dark,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.13,
-    shadowRadius: 26,
-    elevation: 12,
+    borderRadius: 32,
+    paddingHorizontal: 28,
+    paddingVertical: 32,
+    alignItems: "center",
+    overflow: "hidden",
+    shadowColor: C.accent,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 10,
   },
-  centerDot: {
-    position: "absolute",
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: C.dark,
-    zIndex: 10,
-    shadowColor: C.dark,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 4,
+  cardGlow: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: C.accent,
+    borderRadius: 32,
   },
-  timeText: {
-    position: "absolute",
+  timeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  unit: {
+    alignItems: "center",
+    gap: 8,
+    minWidth: 72,
+  },
+  digit: {
     fontFamily: "Georgia",
-    color: C.dark,
     fontWeight: "600",
-    letterSpacing: 2,
-    textAlign: "center",
-    width: "100%",
+    color: C.dark,
+    letterSpacing: -1.5,
+    opacity: 0.88,
+  },
+  digitRunning: {
+    opacity: 1,
+    color: C.accent,
+  },
+  unitLabel: {
+    fontFamily: "Georgia",
+    fontSize: 9,
+    letterSpacing: 3,
+    color: C.dark,
+    opacity: 0.3,
+    textTransform: "uppercase",
+  },
+  unitLabelRunning: {
+    color: C.accent,
     opacity: 0.65,
   },
-
-  controls: {
-    alignItems: "center",
-  },
-  controlsPortrait: {
-    gap: 12,
-  },
-  controlsLandscape: {
-    gap: 14,
-    justifyContent: "center",
+  sep: {
+    fontFamily: "Georgia",
+    fontWeight: "200",
+    color: C.peachMid,
+    marginBottom: 18,
+    opacity: 0.7,
   },
 
-  btnGroup: {
-    alignItems: "center",
-  },
-  btnGroupPortrait: {
-    flexDirection: "row",
-    gap: 18,
-  },
-  btnGroupLandscape: {
-    flexDirection: "column",
-    gap: 12,
-  },
-
-  labelRow: {
-    flexDirection: "row",
-    gap: 18,
-    alignItems: "center",
-  },
-
+  // Controls
+  controls: { alignItems: "center" },
+  controlsPortrait: { gap: 14 },
+  controlsLandscape: { gap: 14, justifyContent: "center" },
+  btnGroup: { alignItems: "center" },
+  btnGroupPortrait: { flexDirection: "row", gap: 20 },
+  btnGroupLandscape: { flexDirection: "column", gap: 14 },
+  labelRow: { flexDirection: "row", gap: 20, alignItems: "center" },
   btnLabel: {
     textAlign: "center",
     fontFamily: "Georgia",
     fontSize: 10,
     letterSpacing: 1.4,
     color: C.dark,
-    opacity: 0.38,
+    opacity: 0.35,
     textTransform: "uppercase",
   },
-
   btn: {
     alignItems: "center",
     justifyContent: "center",
     shadowColor: C.dark,
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 5,
   },
   btnPrimary: { backgroundColor: C.dark },
   btnSecondary: { backgroundColor: C.peachMid },
   btnGhost: {
     backgroundColor: "transparent",
-    borderWidth: 2,
+    borderWidth: 1.5,
     borderColor: C.peachMid,
     shadowOpacity: 0,
     elevation: 0,
   },
-  btnDisabled: { opacity: 0.22 },
+  btnDisabled: { opacity: 0.2 },
 
   statusPill: {
     flexDirection: "row",
     alignItems: "center",
     gap: 7,
-    paddingHorizontal: 15,
-    paddingVertical: 7,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
     borderRadius: 24,
     backgroundColor: C.peach,
   },
   statusPillActive: { backgroundColor: C.dark },
-  statusDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: C.muted,
-  },
+  statusDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.muted },
   statusDotActive: { backgroundColor: C.accentLight },
   statusText: {
     fontFamily: "Georgia",
-    fontSize: 11,
-    letterSpacing: 1.8,
+    fontSize: 10,
+    letterSpacing: 2,
     color: C.dark,
-    opacity: 0.55,
+    opacity: 0.45,
     textTransform: "uppercase",
   },
   statusTextActive: { color: C.peach, opacity: 0.9 },
