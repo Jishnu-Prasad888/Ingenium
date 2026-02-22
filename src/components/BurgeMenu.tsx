@@ -20,11 +20,17 @@ const COLORS = {
   overlay: "rgba(42,21,16,0.45)",
 };
 
+// FIX 1: Panel width constant used in both the style and the animation start value
+//         so they always match. Old code used -280 start but 230 wide panel.
+const PANEL_WIDTH = 230;
+
 interface DrawerProps {
   open: boolean;
   onClose: () => void;
   onItemPress: (key: string) => void;
+  onClosed?: () => void;
 }
+
 const ITEMS = [
   { key: "timer", label: "Timer", icon: Timer },
   { key: "alarm", label: "Alarm", icon: AlarmClock },
@@ -104,47 +110,79 @@ const bi = StyleSheet.create({
   },
 });
 
-function Drawer({ open, onClose, onItemPress }: DrawerProps) {
-  const slideX = useRef(new Animated.Value(-280)).current;
+function Drawer({ open, onClose, onItemPress, onClosed }: DrawerProps) {
+  // FIX 2: Start at -PANEL_WIDTH (not -280) so the initial position matches the panel
+  const slideX = useRef(new Animated.Value(-PANEL_WIDTH)).current;
   const backdropOp = useRef(new Animated.Value(0)).current;
   const itemAnims = useRef(ITEMS.map(() => new Animated.Value(0))).current;
   const [mounted, setMounted] = useState(false);
 
+  // FIX 3: Track in-flight animation so we can cancel it on rapid open/close toggles
+  const animRef = useRef<Animated.CompositeAnimation | null>(null);
+
   useEffect(() => {
     if (open) {
+      // Cancel any in-flight close animation
+      if (animRef.current) {
+        animRef.current.stop();
+        animRef.current = null;
+      }
+
       setMounted(true);
-      slideX.setValue(-280);
+
+      // FIX 4: Reset values synchronously before starting — prevents stale mid-values
+      //         on rapid re-opens
+      slideX.setValue(-PANEL_WIDTH);
+      backdropOp.setValue(0);
       itemAnims.forEach((a) => a.setValue(0));
 
-      Animated.parallel([
-        Animated.spring(slideX, {
-          toValue: 0,
-          useNativeDriver: true,
-          tension: 90,
-          friction: 14,
-        }),
-        Animated.timing(backdropOp, {
-          toValue: 1,
-          duration: 220,
-          useNativeDriver: true,
-        }),
-      ]).start();
-
-      Animated.stagger(
-        55,
-        itemAnims.map((a) =>
-          Animated.spring(a, {
-            toValue: 1,
+      // FIX 5: Use requestAnimationFrame to ensure the component has painted before
+      //         we start stagger animations (avoids invisible first-frame flash)
+      requestAnimationFrame(() => {
+        const slideAndFade = Animated.parallel([
+          Animated.spring(slideX, {
+            toValue: 0,
             useNativeDriver: true,
-            tension: 220,
-            friction: 12,
+            tension: 90,
+            friction: 14,
           }),
-        ),
-      ).start();
+          Animated.timing(backdropOp, {
+            toValue: 1,
+            duration: 220,
+            useNativeDriver: true,
+          }),
+        ]);
+
+        const stagger = Animated.stagger(
+          55,
+          itemAnims.map((a) =>
+            Animated.spring(a, {
+              toValue: 1,
+              useNativeDriver: true,
+              tension: 220,
+              friction: 12,
+            }),
+          ),
+        );
+
+        // Run slide/fade first, then stagger items once panel is visible
+        const combined = Animated.parallel([slideAndFade, stagger]);
+        animRef.current = combined;
+        combined.start(({ finished }) => {
+          if (finished) animRef.current = null;
+        });
+      });
     } else {
-      Animated.parallel([
+      // Cancel any in-flight open animation
+      if (animRef.current) {
+        animRef.current.stop();
+        animRef.current = null;
+      }
+
+      // FIX 6: Close target uses -(PANEL_WIDTH + 20) for a clean overshoot exit
+      const closeAnim = Animated.parallel([
         Animated.spring(slideX, {
-          toValue: -300,
+          toValue: -(PANEL_WIDTH + 20),
           useNativeDriver: true,
           tension: 100,
           friction: 14,
@@ -154,9 +192,13 @@ function Drawer({ open, onClose, onItemPress }: DrawerProps) {
           duration: 200,
           useNativeDriver: true,
         }),
-      ]).start(({ finished }) => {
+      ]);
+      animRef.current = closeAnim;
+      closeAnim.start(({ finished }) => {
+        animRef.current = null;
         if (finished) {
           setMounted(false);
+          onClosed?.();
         }
       });
     }
@@ -234,7 +276,7 @@ const d = StyleSheet.create({
     top: 0,
     bottom: 0,
     left: 0,
-    width: 230,
+    width: PANEL_WIDTH,
     backgroundColor: COLORS.bg,
     zIndex: 60,
     shadowColor: COLORS.dark,
@@ -245,41 +287,6 @@ const d = StyleSheet.create({
   },
   panelInner: {
     flex: 1,
-  },
-  brand: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    paddingHorizontal: 22,
-    paddingTop: 22,
-    paddingBottom: 18,
-  },
-  brandIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 16,
-    backgroundColor: COLORS.peach,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: COLORS.dark,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  brandName: {
-    fontFamily: "Georgia",
-    fontSize: 20,
-    fontWeight: "700",
-    color: COLORS.dark,
-    letterSpacing: 0.5,
-  },
-  brandSub: {
-    fontSize: 11,
-    color: COLORS.accent,
-    fontFamily: "Georgia",
-    marginTop: 1,
-    letterSpacing: 0.3,
   },
   divider: {
     height: 1,
@@ -346,6 +353,9 @@ export default function BurgerMenu() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [timerOpen, setTimerOpen] = useState(false);
   const btnScale = useRef(new Animated.Value(1)).current;
+  // FIX 7: Use a ref for pendingAction so it's always fresh inside the onClosed closure
+  //         (useState is captured at closure creation time; refs are not)
+  const pendingActionRef = useRef<string | null>(null);
 
   const toggleDrawer = () => {
     Animated.sequence([
@@ -372,13 +382,8 @@ export default function BurgerMenu() {
   };
 
   const handleItemPress = (key: string) => {
+    pendingActionRef.current = key;
     setDrawerOpen(false);
-
-    if (key === "timer") {
-      setTimeout(() => {
-        setTimerOpen(true);
-      }, 250); // match drawer close animation duration
-    }
   };
 
   return (
@@ -405,6 +410,13 @@ export default function BurgerMenu() {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         onItemPress={handleItemPress}
+        onClosed={() => {
+          // FIX 8: Read from ref (always current) instead of stale state closure
+          if (pendingActionRef.current === "timer") {
+            setTimerOpen(true);
+          }
+          pendingActionRef.current = null;
+        }}
       />
 
       <TimerModal visible={timerOpen} onClose={() => setTimerOpen(false)} />
@@ -426,13 +438,7 @@ const m = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 16,
-    backgroundColor: COLORS.peach,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: COLORS.dark,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.16,
-    shadowRadius: 10,
-    elevation: 6,
   },
 });

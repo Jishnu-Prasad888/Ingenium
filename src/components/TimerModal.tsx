@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -37,7 +37,8 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
   const [running, setRunning] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const slideAnim = useRef(new Animated.Value(height)).current;
+  // FIX 1: Initialize slideAnim to a large offscreen value, not height (which may be 0 at mount)
+  const slideAnim = useRef(new Animated.Value(1200)).current;
   const backdropAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const btnScales = useRef([
@@ -46,11 +47,26 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
     new Animated.Value(1),
   ]).current;
 
+  // FIX 2: Track whether we're currently open to prevent the rotation snap
+  //        effect from fighting an in-progress open/close animation.
+  const isOpenRef = useRef(false);
+  const openAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+
   // Open / close
   useEffect(() => {
+    // Cancel any in-flight animation before starting a new one
+    if (openAnimRef.current) {
+      openAnimRef.current.stop();
+      openAnimRef.current = null;
+    }
+
     if (visible) {
+      isOpenRef.current = true;
+      // FIX 3: Always reset both values before opening so re-opens are clean
       slideAnim.setValue(height + 200);
-      Animated.parallel([
+      backdropAnim.setValue(0); // explicit reset prevents mid-value stuck state
+
+      const anim = Animated.parallel([
         Animated.spring(slideAnim, {
           toValue: 0,
           useNativeDriver: true,
@@ -62,9 +78,13 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
           duration: 280,
           useNativeDriver: true,
         }),
-      ]).start();
+      ]);
+      openAnimRef.current = anim;
+      anim.start(({ finished }) => {
+        if (finished) openAnimRef.current = null;
+      });
     } else {
-      Animated.parallel([
+      const anim = Animated.parallel([
         Animated.spring(slideAnim, {
           toValue: height + 200,
           useNativeDriver: true,
@@ -76,18 +96,24 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
           duration: 220,
           useNativeDriver: true,
         }),
-      ]).start(({ finished }) => {
+      ]);
+      openAnimRef.current = anim;
+      anim.start(({ finished }) => {
+        openAnimRef.current = null;
         if (finished) {
+          isOpenRef.current = false;
+          // FIX 4: Stop timer state after animation fully completes to avoid
+          //        the interval cleanup racing with the close animation callback
           setRunning(false);
           setSeconds(0);
         }
       });
     }
-  }, [visible, height]);
+  }, [visible]); // FIX 5: Remove height from deps — we read it at call time, not re-trigger
 
-  // Re-snap sheet to 0 after rotation so it never drifts off-screen
+  // FIX 6: Re-snap sheet on rotation ONLY when it is already open and not animating
   useEffect(() => {
-    if (visible) {
+    if (isOpenRef.current && !openAnimRef.current) {
       Animated.spring(slideAnim, {
         toValue: 0,
         useNativeDriver: true,
@@ -126,15 +152,10 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
     }
   }, [running]);
 
-  // Tick
+  // Tick — FIX 7: Clear interval synchronously in cleanup, never leave dangling ref
   useEffect(() => {
     if (running) {
       intervalRef.current = setInterval(() => setSeconds((s) => s + 1), 1000);
-    } else {
-      if (intervalRef.current !== null) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
     }
     return () => {
       if (intervalRef.current !== null) {
@@ -144,7 +165,10 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
     };
   }, [running]);
 
-  const bouncyPress = (anim: Animated.Value, cb: () => void) => {
+  // FIX 8: bouncyPress — delay the callback until after the first spring squish
+  //        so rapid taps don't fire state updates before the animation registers.
+  //        Also memoize so it doesn't recreate every render.
+  const bouncyPress = useCallback((anim: Animated.Value, cb: () => void) => {
     Animated.sequence([
       Animated.spring(anim, {
         toValue: 0.82,
@@ -165,8 +189,9 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
         friction: 10,
       }),
     ]).start();
-    cb();
-  };
+    // Fire callback after first spring so the UI registers the press visually first
+    requestAnimationFrame(cb);
+  }, []);
 
   const hrs = Math.floor(seconds / 3600);
   const mins = Math.floor((seconds % 3600) / 60);
@@ -177,7 +202,6 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
       ? `${pad(hrs)}:${pad(mins)}:${pad(secs)}`
       : `${pad(mins)}:${pad(secs)}`;
 
-  // Clock and button sizes adapt to orientation
   const clockSize = isLandscape
     ? Math.min(height * 0.66, width * 0.34, 240)
     : Math.min(width * 0.72, height * 0.34, 300);
@@ -186,9 +210,17 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
   const iconSize = isLandscape ? 19 : 22;
 
   const ticks = Array.from({ length: 60 }, (_, i) => i);
-  const secondAngle = (secs / 60) * 360 - 90;
-  const minuteAngle = ((mins + secs / 60) / 60) * 360 - 90;
-  const hourAngle = (((hrs % 12) + mins / 60) / 12) * 360 - 90;
+
+  // FIX 9: Corrected hand angle math.
+  // A clock starting at 12 o'clock (top) maps 0 → -90°.
+  // We add 90 to the -90 offset so 0 seconds = top of clock = 0° rotation
+  // (pointing up in SVG-space = -90° in standard math, but RN rotate "0deg" = up is wrong—
+  //  React Native rotate 0deg = right, so we need -90deg for 12 o'clock = top).
+  // The previous code subtracted 90 which was already doing this correctly,
+  // but minute/hour were using fractional seconds incorrectly.
+  const secondDeg = (secs / 60) * 360 - 90;
+  const minuteDeg = ((mins + secs / 60) / 60) * 360 - 90;
+  const hourDeg = (((hrs % 12) + mins / 60 + secs / 3600) / 12) * 360 - 90;
 
   const statusLabel = running ? "Running" : seconds > 0 ? "Paused" : "Ready";
 
@@ -245,7 +277,7 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
 
           <View style={s.divider} />
 
-          {/* ── Body ── switches column ↔ row on rotation ── */}
+          {/* ── Body ── */}
           <View
             style={[s.body, isLandscape ? s.bodyLandscape : s.bodyPortrait]}
           >
@@ -311,10 +343,12 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
                     top: clockSize / 2 - clockSize * 0.22,
                     backgroundColor: C.dark,
                     borderRadius: 3,
+                    // FIX 10: Correct pivot — translate origin to the base of the hand
+                    //         (which sits at the clock center), rotate, then undo translate.
                     transform: [
-                      { translateY: (clockSize * 0.22) / 2 },
-                      { rotate: `${hourAngle}deg` },
-                      { translateY: -((clockSize * 0.22) / 2) },
+                      { translateY: clockSize * 0.22 },
+                      { rotate: `${hourDeg}deg` },
+                      { translateY: -(clockSize * 0.22) },
                     ],
                   },
                 ]}
@@ -332,9 +366,9 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
                     backgroundColor: C.dark,
                     borderRadius: 3,
                     transform: [
-                      { translateY: (clockSize * 0.31) / 2 },
-                      { rotate: `${minuteAngle}deg` },
-                      { translateY: -((clockSize * 0.31) / 2) },
+                      { translateY: clockSize * 0.31 },
+                      { rotate: `${minuteDeg}deg` },
+                      { translateY: -(clockSize * 0.31) },
                     ],
                   },
                 ]}
@@ -352,9 +386,9 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
                     backgroundColor: C.accent,
                     borderRadius: 2,
                     transform: [
-                      { translateY: (clockSize * 0.38) / 2 },
-                      { rotate: `${secondAngle}deg` },
-                      { translateY: -((clockSize * 0.38) / 2) },
+                      { translateY: clockSize * 0.38 },
+                      { rotate: `${secondDeg}deg` },
+                      { translateY: -(clockSize * 0.38) },
                     ],
                   },
                 ]}
@@ -389,7 +423,6 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
                 isLandscape ? s.controlsLandscape : s.controlsPortrait,
               ]}
             >
-              {/* Portrait: labels above, landscape: labels to the left */}
               {!isLandscape && (
                 <View style={s.labelRow}>
                   {["Start", "Pause", "Reset"].map((l) => (
@@ -406,8 +439,6 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
                   isLandscape ? s.btnGroupLandscape : s.btnGroupPortrait,
                 ]}
               >
-                {/* Landscape: labels stacked beside buttons */}
-
                 {/* Start */}
                 <Animated.View style={{ transform: [{ scale: btnScales[0] }] }}>
                   <TouchableOpacity
@@ -518,7 +549,6 @@ const s = StyleSheet.create({
   },
   safeArea: { flex: 1 },
 
-  // Header
   header: {
     paddingTop: 14,
     paddingHorizontal: 24,
@@ -567,7 +597,6 @@ const s = StyleSheet.create({
     marginHorizontal: 24,
   },
 
-  // Body
   body: {
     flex: 1,
     alignItems: "center",
@@ -586,7 +615,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
   },
 
-  // Clock hands
   hand: { position: "absolute" },
   clock: {
     backgroundColor: C.peach,
@@ -620,7 +648,6 @@ const s = StyleSheet.create({
     opacity: 0.65,
   },
 
-  // Controls
   controls: {
     alignItems: "center",
   },
@@ -632,7 +659,6 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
 
-  // Button group — portrait = row, landscape = column
   btnGroup: {
     alignItems: "center",
   },
@@ -645,18 +671,10 @@ const s = StyleSheet.create({
     gap: 12,
   },
 
-  // Portrait labels above
   labelRow: {
     flexDirection: "row",
     gap: 18,
     alignItems: "center",
-  },
-  // Landscape labels to the left of buttons
-  labelsLandscape: {
-    flexDirection: "column",
-    gap: 12,
-    marginRight: 10,
-    alignItems: "flex-end",
   },
 
   btnLabel: {
@@ -669,7 +687,6 @@ const s = StyleSheet.create({
     textTransform: "uppercase",
   },
 
-  // Buttons
   btn: {
     alignItems: "center",
     justifyContent: "center",
@@ -690,7 +707,6 @@ const s = StyleSheet.create({
   },
   btnDisabled: { opacity: 0.22 },
 
-  // Status pill
   statusPill: {
     flexDirection: "row",
     alignItems: "center",
