@@ -47,40 +47,40 @@ const LIGHT = {
 };
 
 const DARK = {
-  bg: "#111214",
-  sheet: "#111214",
+  bg: "#15121C",
+  sheet: "#15121C",
 
-  card: "#1A1C1F",
-  cardGlow: "#E5484D",
+  card: "#1E1828",
+  cardGlow: "#FF9BD2",
 
-  dark: "#F3F4F6",
+  dark: "#F6F0FF",
 
-  peach: "#1F2226",
-  peachMid: "#262A2F",
+  peach: "#241D33",
+  peachMid: "#2C2440",
 
-  accent: "#E5484D",
-  accentLight: "#FF6B6F",
+  accent: "#FF9BD2",
+  accentLight: "#FFC2E6",
 
-  muted: "rgba(243,244,246,0.35)",
-  overlay: "rgba(0,0,0,0.8)",
+  muted: "rgba(246,240,255,0.35)",
+  overlay: "rgba(0,0,0,0.65)",
 
-  divider: "#262A2F",
-  handle: "#2E3238",
+  divider: "#2C2440",
+  handle: "#342B4D",
 
-  titleOp: 0.55,
+  titleOp: 0.6,
   digitOp: 0.95,
 
-  sepColor: "#32363C",
-  btnGhost: "#32363C",
+  sepColor: "#3A2F59",
+  btnGhost: "#3A2F59",
 
-  statusBg: "#1F2226",
-  statusActive: "#E5484D",
+  statusBg: "#241D33",
+  statusActive: "#FF9BD2",
 
-  themeBtnBg: "#1F2226",
-  themeBtnIcon: "#F3F4F6",
+  themeBtnBg: "#241D33",
+  themeBtnIcon: "#F6F0FF",
 
-  snow: "#32363C",
-  labelOp: 0.45,
+  snow: "#3A2F59",
+  labelOp: 0.5,
 };
 
 type Theme = typeof LIGHT;
