@@ -12,15 +12,19 @@ import {
   Easing,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Play, Pause, RotateCcw, X } from "lucide-react-native";
+import { Play, Pause, RotateCcw, X, Sun, Moon } from "lucide-react-native";
 
 interface TimerModalProps {
   visible: boolean;
   onClose: () => void;
 }
 
-const C = {
+// ── Themes ────────────────────────────────────────────────────────
+const LIGHT = {
   bg: "#FFF9EF",
+  sheet: "#FFF9EF",
+  card: "#F7D5CA",
+  cardGlow: "#d4836a",
   dark: "#2A1510",
   peach: "#F7D5CA",
   peachMid: "#f0b8a5",
@@ -28,9 +32,60 @@ const C = {
   accentLight: "#f5c4b4",
   muted: "rgba(42,21,16,0.35)",
   overlay: "rgba(42,21,16,0.6)",
+  divider: "#f0b8a5",
+  handle: "#f0b8a5",
+  titleOp: 0.45,
+  digitOp: 0.88,
+  sepColor: "#f0b8a5",
+  btnGhost: "#f0b8a5",
+  statusBg: "#F7D5CA",
+  statusActive: "#2A1510",
+  themeBtnBg: "#F7D5CA",
+  themeBtnIcon: "#2A1510",
+  snow: "#f0b8a5",
+  labelOp: 0.35,
 };
 
-// ── Snow ─────────────────────────────────────────────────────────
+const DARK = {
+  bg: "#0B0F1A",
+  sheet: "#0B0F1A",
+
+  card: "#12172A",
+  cardGlow: "#7C5CFF",
+
+  dark: "#E6E9F2",
+
+  peach: "#161C32",
+  peachMid: "#1D2542",
+
+  accent: "#7C5CFF",
+  accentLight: "#A58BFF",
+
+  muted: "rgba(230,233,242,0.35)",
+  overlay: "rgba(0,0,0,0.75)",
+
+  divider: "#1C2340",
+  handle: "#242C52",
+
+  titleOp: 0.55,
+  digitOp: 0.95,
+
+  sepColor: "#2B3360",
+  btnGhost: "#2B3360",
+
+  statusBg: "#161C32",
+  statusActive: "#7C5CFF",
+
+  themeBtnBg: "#161C32",
+  themeBtnIcon: "#E6E9F2",
+
+  snow: "#2B3360",
+  labelOp: 0.45,
+};
+
+type Theme = typeof LIGHT;
+
+// ── Snow ──────────────────────────────────────────────────────────
 const FLAKE_COUNT = 28;
 
 interface Flake {
@@ -61,13 +116,11 @@ function animateFlake(flake: Flake, w: number, h: number) {
   flake.y.setValue(-0.05);
   flake.x.setValue(flake.startX);
   flake.opacity.setValue(0);
-
   const swayDur = 2500 + Math.random() * 2000;
   const targetX = Math.max(
     0,
     Math.min(1, flake.startX + (Math.random() > 0.5 ? 1 : -1) * flake.drift),
   );
-
   const sway = Animated.loop(
     Animated.sequence([
       Animated.timing(flake.x, {
@@ -84,19 +137,18 @@ function animateFlake(flake: Flake, w: number, h: number) {
       }),
     ]),
   );
-
-  const peakOpacity = 0.45 + Math.random() * 0.3;
+  const peak = 0.45 + Math.random() * 0.3;
   const fall = Animated.sequence([
     Animated.delay(flake.delay),
     Animated.parallel([
       Animated.sequence([
         Animated.timing(flake.opacity, {
-          toValue: peakOpacity,
+          toValue: peak,
           duration: flake.duration * 0.15,
           useNativeDriver: true,
         }),
         Animated.timing(flake.opacity, {
-          toValue: peakOpacity,
+          toValue: peak,
           duration: flake.duration * 0.7,
           useNativeDriver: true,
         }),
@@ -114,7 +166,6 @@ function animateFlake(flake: Flake, w: number, h: number) {
       }),
     ]),
   ]);
-
   sway.start();
   fall.start(({ finished }) => {
     if (finished) {
@@ -126,21 +177,26 @@ function animateFlake(flake: Flake, w: number, h: number) {
   });
 }
 
-function Snow({ width, height }: { width: number; height: number }) {
+function Snow({
+  width,
+  height,
+  color,
+}: {
+  width: number;
+  height: number;
+  color: string;
+}) {
   const flakesRef = useRef<Flake[]>(makeFlakes());
-
   useEffect(() => {
     const flakes = flakesRef.current;
     flakes.forEach((f) => animateFlake(f, width, height));
-    return () => {
+    return () =>
       flakes.forEach((f) => {
         f.y.stopAnimation();
         f.x.stopAnimation();
         f.opacity.stopAnimation();
       });
-    };
   }, []);
-
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
       {flakesRef.current.map((flake, i) => (
@@ -153,7 +209,7 @@ function Snow({ width, height }: { width: number; height: number }) {
             width: flake.size,
             height: flake.size,
             borderRadius: flake.size / 2,
-            backgroundColor: C.peachMid,
+            backgroundColor: color,
             opacity: flake.opacity,
             transform: [
               {
@@ -176,16 +232,21 @@ function Snow({ width, height }: { width: number; height: number }) {
   );
 }
 
-// ── Timer Modal ───────────────────────────────────────────────────
+// ── Main Component ────────────────────────────────────────────────
 export default function TimerModal({ visible, onClose }: TimerModalProps) {
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
 
+  const [isDark, setIsDark] = useState(false);
+
   const [seconds, setSeconds] = useState(0);
   const [running, setRunning] = useState(false);
+  // mounted controls whether the Modal is in the tree at all
+  const [mounted, setMounted] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const slideAnim = useRef(new Animated.Value(1200)).current;
+  // KEY FIX: initialise FAR offscreen so the very first paint is never at y=0
+  const slideAnim = useRef(new Animated.Value(2000)).current;
   const backdropAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const glowAnim = useRef(new Animated.Value(0)).current;
@@ -194,20 +255,52 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
     new Animated.Value(1),
     new Animated.Value(1),
   ]).current;
+  const themeBtnScale = useRef(new Animated.Value(1)).current;
 
   const isOpenRef = useRef(false);
   const openAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
-  // Open/close sheet
+  const T: Theme = isDark ? DARK : LIGHT;
+
+  const toggleTheme = () => {
+    Animated.sequence([
+      Animated.spring(themeBtnScale, {
+        toValue: 0.8,
+        useNativeDriver: true,
+        tension: 300,
+        friction: 10,
+      }),
+      Animated.spring(themeBtnScale, {
+        toValue: 1.15,
+        useNativeDriver: true,
+        tension: 300,
+        friction: 8,
+      }),
+      Animated.spring(themeBtnScale, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 200,
+        friction: 10,
+      }),
+    ]).start();
+    setIsDark((v) => !v);
+  };
+
+  // Open/close — mount THEN animate, unmount only after close animation finishes
   useEffect(() => {
     if (openAnimRef.current) {
       openAnimRef.current.stop();
       openAnimRef.current = null;
     }
+
     if (visible) {
-      isOpenRef.current = true;
-      slideAnim.setValue(height + 200);
+      // 1. Reset position & opacity synchronously BEFORE mounting so first paint is offscreen
+      slideAnim.setValue(height + 300);
       backdropAnim.setValue(0);
+      // 2. Mount the Modal
+      setMounted(true);
+      isOpenRef.current = true;
+      // 3. Animate in on the next frame — after mount paint
       const anim = Animated.parallel([
         Animated.spring(slideAnim, {
           toValue: 0,
@@ -226,9 +319,10 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
         if (finished) openAnimRef.current = null;
       });
     } else {
+      // Animate out first, then unmount
       const anim = Animated.parallel([
         Animated.spring(slideAnim, {
-          toValue: height + 200,
+          toValue: height + 300,
           useNativeDriver: true,
           tension: 85,
           friction: 14,
@@ -244,6 +338,7 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
         openAnimRef.current = null;
         if (finished) {
           isOpenRef.current = false;
+          setMounted(false);
           setRunning(false);
           setSeconds(0);
         }
@@ -251,7 +346,6 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
     }
   }, [visible]);
 
-  // Re-snap after rotation
   useEffect(() => {
     if (isOpenRef.current && !openAnimRef.current) {
       Animated.spring(slideAnim, {
@@ -263,7 +357,6 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
     }
   }, [width, height]);
 
-  // Pulse while running
   useEffect(() => {
     if (running) {
       const breathe = Animated.loop(
@@ -302,11 +395,9 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
     }
   }, [running]);
 
-  // Tick
   useEffect(() => {
-    if (running) {
+    if (running)
       intervalRef.current = setInterval(() => setSeconds((s) => s + 1), 1000);
-    }
     return () => {
       if (intervalRef.current !== null) {
         clearInterval(intervalRef.current);
@@ -345,27 +436,21 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
   const pad = (n: number) => String(n).padStart(2, "0");
   const statusLabel = running ? "Running" : seconds > 0 ? "Paused" : "Ready";
 
-  // Responsive sizing
   const btnSize = isLandscape ? 50 : 60;
   const iconSize = isLandscape ? 17 : 21;
-
-  // Digit font: smaller in landscape since card is more compact
   const digitFontSize = isLandscape
     ? Math.min(height * 0.18, 48)
     : Math.min(width * 0.155, 64);
-
+  const cardMaxWidth = isLandscape ? width * 0.48 : width - 48;
   const glowOpacity = glowAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, 0.06],
+    outputRange: [0, isDark ? 0.12 : 0.06],
   });
-
-  // Card sizing: in landscape constrain to left half
-  const cardMaxWidth = isLandscape ? width * 0.48 : width - 48;
 
   return (
     <Modal
       transparent
-      visible={visible}
+      visible={mounted}
       animationType="none"
       onRequestClose={onClose}
       statusBarTranslucent
@@ -380,21 +465,27 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
       <StatusBar
         backgroundColor="transparent"
         translucent
-        barStyle="dark-content"
+        barStyle={isDark ? "light-content" : "dark-content"}
       />
 
-      {/* Backdrop */}
-      <Animated.View style={[s.backdrop, { opacity: backdropAnim }]}>
+      <Animated.View
+        style={[
+          s.backdrop,
+          { opacity: backdropAnim, backgroundColor: T.overlay },
+        ]}
+      >
         <TouchableWithoutFeedback onPress={onClose}>
           <View style={StyleSheet.absoluteFill} />
         </TouchableWithoutFeedback>
       </Animated.View>
 
-      {/* Sheet */}
       <Animated.View
-        style={[s.sheet, { transform: [{ translateY: slideAnim }] }]}
+        style={[
+          s.sheet,
+          { backgroundColor: T.sheet, transform: [{ translateY: slideAnim }] },
+        ]}
       >
-        <Snow width={width} height={height} />
+        <Snow width={width} height={height} color={T.snow} />
 
         <SafeAreaView
           edges={["top", "bottom", "left", "right"]}
@@ -402,118 +493,202 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
         >
           {/* Header */}
           <View style={[s.header, isLandscape && s.headerLandscape]}>
-            {!isLandscape && <View style={s.handle} />}
+            {!isLandscape && (
+              <View style={[s.handle, { backgroundColor: T.handle }]} />
+            )}
             <View style={s.headerRow}>
-              <Text style={s.title}>TIMER</Text>
+              <Text style={[s.title, { color: T.dark, opacity: T.titleOp }]}>
+                TIMER
+              </Text>
+
+              {/* Theme toggle */}
+              <Animated.View
+                style={[s.themeBtn, { transform: [{ scale: themeBtnScale }] }]}
+              >
+                <TouchableOpacity
+                  onPress={toggleTheme}
+                  style={[s.themeBtnInner, { backgroundColor: T.themeBtnBg }]}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  activeOpacity={0.8}
+                >
+                  {isDark ? (
+                    <Sun size={13} color={T.themeBtnIcon} strokeWidth={2.2} />
+                  ) : (
+                    <Moon size={13} color={T.themeBtnIcon} strokeWidth={2.2} />
+                  )}
+                </TouchableOpacity>
+              </Animated.View>
+
               <TouchableOpacity
                 onPress={onClose}
-                style={s.closeBtn}
+                style={[s.closeBtn, { backgroundColor: T.peach }]}
                 hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
               >
-                <X size={13} color={C.dark} strokeWidth={2.8} />
+                <X size={13} color={T.dark} strokeWidth={2.8} />
               </TouchableOpacity>
             </View>
           </View>
 
-          <View style={s.divider} />
+          <View style={[s.divider, { backgroundColor: T.divider }]} />
 
-          {/* ── Body: portrait = column, landscape = row ── */}
+          {/* Body */}
           <View style={[s.body, isLandscape ? s.bodyRow : s.bodyColumn]}>
-            {/* Left / top: Time display card */}
+            {/* Time card */}
             <Animated.View
               style={[
                 s.card,
-                { maxWidth: cardMaxWidth, transform: [{ scale: pulseAnim }] },
+                {
+                  backgroundColor: T.card,
+                  maxWidth: cardMaxWidth,
+                  transform: [{ scale: pulseAnim }],
+                },
                 isLandscape && s.cardLandscape,
               ]}
             >
-              <Animated.View style={[s.cardGlow, { opacity: glowOpacity }]} />
-
+              <Animated.View
+                style={[
+                  s.cardGlow,
+                  { backgroundColor: T.cardGlow, opacity: glowOpacity },
+                ]}
+              />
               <View style={s.timeRow}>
                 {/* HRS */}
                 <View style={s.unit}>
-                  <Text style={[s.digit, { fontSize: digitFontSize }]}>
+                  <Text
+                    style={[
+                      s.digit,
+                      {
+                        fontSize: digitFontSize,
+                        color: T.dark,
+                        opacity: T.digitOp,
+                      },
+                    ]}
+                  >
                     {pad(hrs)}
                   </Text>
-                  <Text style={s.unitLabel}>HRS</Text>
+                  <Text
+                    style={[s.unitLabel, { color: T.dark, opacity: T.labelOp }]}
+                  >
+                    HRS
+                  </Text>
                 </View>
-
-                <Text style={[s.sep, { fontSize: digitFontSize * 0.6 }]}>
+                <Text
+                  style={[
+                    s.sep,
+                    { fontSize: digitFontSize * 0.6, color: T.sepColor },
+                  ]}
+                >
                   :
                 </Text>
-
                 {/* MIN */}
                 <View style={s.unit}>
-                  <Text style={[s.digit, { fontSize: digitFontSize }]}>
+                  <Text
+                    style={[
+                      s.digit,
+                      {
+                        fontSize: digitFontSize,
+                        color: T.dark,
+                        opacity: T.digitOp,
+                      },
+                    ]}
+                  >
                     {pad(mins)}
                   </Text>
-                  <Text style={s.unitLabel}>MIN</Text>
+                  <Text
+                    style={[s.unitLabel, { color: T.dark, opacity: T.labelOp }]}
+                  >
+                    MIN
+                  </Text>
                 </View>
-
-                <Text style={[s.sep, { fontSize: digitFontSize * 0.6 }]}>
+                <Text
+                  style={[
+                    s.sep,
+                    { fontSize: digitFontSize * 0.6, color: T.sepColor },
+                  ]}
+                >
                   :
                 </Text>
-
                 {/* SEC */}
                 <View style={s.unit}>
                   <Text
                     style={[
                       s.digit,
-                      { fontSize: digitFontSize },
-                      running && s.digitRunning,
+                      {
+                        fontSize: digitFontSize,
+                        color: running ? T.accent : T.dark,
+                        opacity: running ? 1 : T.digitOp,
+                      },
                     ]}
                   >
                     {pad(secs)}
                   </Text>
-                  <Text style={[s.unitLabel, running && s.unitLabelRunning]}>
+                  <Text
+                    style={[
+                      s.unitLabel,
+                      {
+                        color: running ? T.accent : T.dark,
+                        opacity: running ? 0.65 : T.labelOp,
+                      },
+                    ]}
+                  >
                     SEC
                   </Text>
                 </View>
               </View>
             </Animated.View>
 
-            {/* Divider between card and controls in landscape */}
-            {isLandscape && <View style={s.verticalDivider} />}
+            {isLandscape && (
+              <View
+                style={[s.verticalDivider, { backgroundColor: T.divider }]}
+              />
+            )}
 
-            {/* Right / bottom: Controls */}
+            {/* Controls */}
             <View
               style={[
                 s.controls,
                 isLandscape ? s.controlsLandscape : s.controlsPortrait,
               ]}
             >
-              {/* Button labels — portrait only above row */}
               {!isLandscape && (
                 <View style={s.labelRow}>
                   {["Start", "Pause", "Reset"].map((l) => (
-                    <Text key={l} style={[s.btnLabel, { width: btnSize }]}>
+                    <Text
+                      key={l}
+                      style={[
+                        s.btnLabel,
+                        { width: btnSize, color: T.dark, opacity: T.labelOp },
+                      ]}
+                    >
                       {l}
                     </Text>
                   ))}
                 </View>
               )}
 
-              {/* Buttons: row in portrait, column in landscape */}
               <View
                 style={[
                   s.btnGroup,
                   isLandscape ? s.btnGroupColumn : s.btnGroupRow,
                 ]}
               >
-                {/* Landscape: label to the left of each button */}
                 {(["Start", "Pause", "Reset"] as const).map((label, idx) => {
                   const icons = [
-                    <Play size={iconSize} color={C.peach} fill={C.peach} />,
-                    <Pause size={iconSize} color={C.dark} fill={C.dark} />,
+                    <Play
+                      size={iconSize}
+                      color={isDark ? T.bg : "#FFF9EF"}
+                      fill={isDark ? T.bg : "#FFF9EF"}
+                    />,
+                    <Pause size={iconSize} color={T.dark} fill={T.dark} />,
                     <RotateCcw
                       size={iconSize}
-                      color={C.dark}
+                      color={T.dark}
                       strokeWidth={2.2}
                     />,
                   ];
-                  const btnStyles = [s.btnPrimary, s.btnSecondary, s.btnGhost];
-                  const disabledCond = [running, !running, false];
-                  const onPresses = [
+                  const bgColors = [T.dark, T.peachMid, "transparent"];
+                  const disabled = [running, !running, false];
+                  const onPress = [
                     () => bouncyPress(btnScales[0], () => setRunning(true)),
                     () => bouncyPress(btnScales[1], () => setRunning(false)),
                     () =>
@@ -522,31 +697,42 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
                         setSeconds(0);
                       }),
                   ];
-
                   return (
                     <View
                       key={label}
                       style={isLandscape ? s.btnRowWithLabel : undefined}
                     >
                       {isLandscape && (
-                        <Text style={s.btnLabelLandscape}>{label}</Text>
+                        <Text
+                          style={[
+                            s.btnLabelLandscape,
+                            { color: T.dark, opacity: T.labelOp },
+                          ]}
+                        >
+                          {label}
+                        </Text>
                       )}
                       <Animated.View
                         style={{ transform: [{ scale: btnScales[idx] }] }}
                       >
                         <TouchableOpacity
-                          onPress={onPresses[idx]}
-                          disabled={disabledCond[idx]}
+                          onPress={onPress[idx]}
+                          disabled={disabled[idx]}
                           activeOpacity={0.88}
                           style={[
                             s.btn,
+                            idx === 2 && s.btnNoShadow,
                             {
                               width: btnSize,
                               height: btnSize,
                               borderRadius: btnSize / 2,
+                              backgroundColor: bgColors[idx],
                             },
-                            btnStyles[idx],
-                            disabledCond[idx] && s.btnDisabled,
+                            idx === 2 && {
+                              borderWidth: 1.5,
+                              borderColor: T.btnGhost,
+                            },
+                            disabled[idx] && s.btnDisabled,
                           ]}
                         >
                           {icons[idx]}
@@ -558,9 +744,27 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
               </View>
 
               {/* Status pill */}
-              <View style={[s.statusPill, running && s.statusPillActive]}>
-                <View style={[s.statusDot, running && s.statusDotActive]} />
-                <Text style={[s.statusText, running && s.statusTextActive]}>
+              <View
+                style={[
+                  s.statusPill,
+                  { backgroundColor: running ? T.statusActive : T.statusBg },
+                ]}
+              >
+                <View
+                  style={[
+                    s.statusDot,
+                    { backgroundColor: running ? T.accentLight : T.muted },
+                  ]}
+                />
+                <Text
+                  style={[
+                    s.statusText,
+                    {
+                      color: running ? (isDark ? T.bg : "#FFF9EF") : T.dark,
+                      opacity: running ? 0.9 : 0.45,
+                    },
+                  ]}
+                >
                   {statusLabel}
                 </Text>
               </View>
@@ -573,16 +777,15 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
 }
 
 const s = StyleSheet.create({
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: C.overlay },
+  backdrop: { ...StyleSheet.absoluteFillObject },
   sheet: {
     position: "absolute",
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: C.bg,
     overflow: "hidden",
-    shadowColor: C.dark,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: -8 },
     shadowOpacity: 0.18,
     shadowRadius: 28,
@@ -590,7 +793,6 @@ const s = StyleSheet.create({
   },
   safeArea: { flex: 1 },
 
-  // Header
   header: {
     paddingTop: 14,
     paddingHorizontal: 24,
@@ -598,13 +800,7 @@ const s = StyleSheet.create({
     alignItems: "center",
   },
   headerLandscape: { paddingTop: 6 },
-  handle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: C.peachMid,
-    marginBottom: 16,
-  },
+  handle: { width: 36, height: 4, borderRadius: 2, marginBottom: 16 },
   headerRow: {
     width: "100%",
     flexDirection: "row",
@@ -617,9 +813,16 @@ const s = StyleSheet.create({
     fontFamily: "Georgia",
     fontSize: 12,
     fontWeight: "700",
-    color: C.dark,
     letterSpacing: 5,
-    opacity: 0.45,
+  },
+
+  themeBtn: { position: "absolute", left: 0 },
+  themeBtnInner: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
   },
   closeBtn: {
     position: "absolute",
@@ -627,26 +830,18 @@ const s = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: C.peach,
     alignItems: "center",
     justifyContent: "center",
   },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: C.peachMid,
-    marginHorizontal: 24,
-  },
+  divider: { height: StyleSheet.hairlineWidth, marginHorizontal: 24 },
 
-  // Body layouts
   body: { flex: 1, alignItems: "center", justifyContent: "center" },
-  // Portrait: stack vertically
   bodyColumn: {
     flexDirection: "column",
     gap: 36,
     paddingVertical: 24,
     paddingHorizontal: 24,
   },
-  // Landscape: side by side
   bodyRow: {
     flexDirection: "row",
     gap: 0,
@@ -654,130 +849,87 @@ const s = StyleSheet.create({
     paddingHorizontal: 20,
   },
 
-  // Vertical separator in landscape
   verticalDivider: {
     width: StyleSheet.hairlineWidth,
-    backgroundColor: C.peachMid,
     marginHorizontal: 28,
     alignSelf: "stretch",
     marginVertical: 8,
   },
 
-  // Card
   card: {
-    backgroundColor: C.peach,
     borderRadius: 28,
     paddingHorizontal: 24,
     paddingVertical: 28,
     alignItems: "center",
     overflow: "hidden",
-    shadowColor: C.accent,
+    alignSelf: "center",
+    shadowColor: "#d4836a",
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.16,
     shadowRadius: 22,
     elevation: 10,
-    alignSelf: "center",
   },
-  cardLandscape: {
-    flex: 1,
-    alignSelf: "center",
-  },
-  cardGlow: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: C.accent,
-    borderRadius: 28,
-  },
+  cardLandscape: { flex: 1, alignSelf: "center" },
+  cardGlow: { ...StyleSheet.absoluteFillObject, borderRadius: 28 },
 
   timeRow: { flexDirection: "row", alignItems: "center", gap: 2 },
   unit: { alignItems: "center", gap: 6, minWidth: 64 },
-  digit: {
-    fontFamily: "Georgia",
-    fontWeight: "600",
-    color: C.dark,
-    letterSpacing: -1.5,
-    opacity: 0.88,
-  },
-  digitRunning: { opacity: 1, color: C.accent },
+  digit: { fontFamily: "Georgia", fontWeight: "600", letterSpacing: -1.5 },
   unitLabel: {
     fontFamily: "Georgia",
     fontSize: 9,
     letterSpacing: 3,
-    color: C.dark,
-    opacity: 0.3,
     textTransform: "uppercase",
   },
-  unitLabelRunning: { color: C.accent, opacity: 0.6 },
   sep: {
     fontFamily: "Georgia",
     fontWeight: "200",
-    color: C.peachMid,
     marginBottom: 16,
     opacity: 0.7,
   },
 
-  // Controls panel
   controls: { alignItems: "center" },
-  // Portrait: compact column
   controlsPortrait: { gap: 12 },
-  // Landscape: centered column taking right half
   controlsLandscape: { gap: 16, justifyContent: "center", flex: 1 },
 
-  // Button groups
   btnGroup: { alignItems: "center" },
-  btnGroupRow: { flexDirection: "row", gap: 20 }, // portrait
+  btnGroupRow: { flexDirection: "row", gap: 20 },
   btnGroupColumn: {
     flexDirection: "column",
     gap: 14,
     alignItems: "flex-start",
-  }, // landscape
+  },
 
-  // Landscape: each button sits in a row with its text label on the left
   btnRowWithLabel: { flexDirection: "row", alignItems: "center", gap: 14 },
   btnLabelLandscape: {
     fontFamily: "Georgia",
     fontSize: 11,
     letterSpacing: 1.2,
-    color: C.dark,
-    opacity: 0.38,
     textTransform: "uppercase",
     width: 44,
     textAlign: "right",
   },
-
-  // Portrait labels above button row
   labelRow: { flexDirection: "row", gap: 20, alignItems: "center" },
   btnLabel: {
     textAlign: "center",
     fontFamily: "Georgia",
     fontSize: 10,
     letterSpacing: 1.4,
-    color: C.dark,
-    opacity: 0.35,
     textTransform: "uppercase",
   },
 
-  // Buttons
   btn: {
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: C.dark,
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.12,
     shadowRadius: 10,
     elevation: 5,
   },
-  btnPrimary: { backgroundColor: C.dark },
-  btnSecondary: { backgroundColor: C.peachMid },
-  btnGhost: {
-    backgroundColor: "transparent",
-    borderWidth: 1.5,
-    borderColor: C.peachMid,
-    shadowOpacity: 0,
-    elevation: 0,
-  },
+  btnNoShadow: { shadowOpacity: 0, elevation: 0 },
   btnDisabled: { opacity: 0.2 },
 
-  // Status pill
   statusPill: {
     flexDirection: "row",
     alignItems: "center",
@@ -785,18 +937,12 @@ const s = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 24,
-    backgroundColor: C.peach,
   },
-  statusPillActive: { backgroundColor: C.dark },
-  statusDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: C.muted },
-  statusDotActive: { backgroundColor: C.accentLight },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
   statusText: {
     fontFamily: "Georgia",
     fontSize: 10,
     letterSpacing: 2,
-    color: C.dark,
-    opacity: 0.45,
     textTransform: "uppercase",
   },
-  statusTextActive: { color: C.peach, opacity: 0.9 },
 });
