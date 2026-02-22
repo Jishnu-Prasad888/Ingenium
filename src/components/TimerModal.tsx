@@ -47,39 +47,39 @@ const LIGHT = {
 };
 
 const DARK = {
-  bg: "#0B0F1A",
-  sheet: "#0B0F1A",
+  bg: "#0D1412",
+  sheet: "#0D1412",
 
-  card: "#12172A",
-  cardGlow: "#7C5CFF",
+  card: "#13201C",
+  cardGlow: "#2ED3A6",
 
-  dark: "#E6E9F2",
+  dark: "#E7F5F1",
 
-  peach: "#161C32",
-  peachMid: "#1D2542",
+  peach: "#162823",
+  peachMid: "#1D332D",
 
-  accent: "#7C5CFF",
-  accentLight: "#A58BFF",
+  accent: "#2ED3A6",
+  accentLight: "#6EE7C8",
 
-  muted: "rgba(230,233,242,0.35)",
-  overlay: "rgba(0,0,0,0.75)",
+  muted: "rgba(231,245,241,0.35)",
+  overlay: "rgba(0,0,0,0.7)",
 
-  divider: "#1C2340",
-  handle: "#242C52",
+  divider: "#1D332D",
+  handle: "#24423B",
 
   titleOp: 0.55,
   digitOp: 0.95,
 
-  sepColor: "#2B3360",
-  btnGhost: "#2B3360",
+  sepColor: "#2A4A42",
+  btnGhost: "#2A4A42",
 
-  statusBg: "#161C32",
-  statusActive: "#7C5CFF",
+  statusBg: "#162823",
+  statusActive: "#2ED3A6",
 
-  themeBtnBg: "#161C32",
-  themeBtnIcon: "#E6E9F2",
+  themeBtnBg: "#162823",
+  themeBtnIcon: "#E7F5F1",
 
-  snow: "#2B3360",
+  snow: "#2A4A42",
   labelOp: 0.45,
 };
 
