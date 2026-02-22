@@ -20,8 +20,6 @@ const COLORS = {
   overlay: "rgba(42,21,16,0.45)",
 };
 
-// FIX 1: Panel width constant used in both the style and the animation start value
-//         so they always match. Old code used -280 start but 230 wide panel.
 const PANEL_WIDTH = 230;
 
 interface DrawerProps {
@@ -111,49 +109,39 @@ const bi = StyleSheet.create({
 });
 
 function Drawer({ open, onClose, onItemPress, onClosed }: DrawerProps) {
-  // FIX 2: Start at -PANEL_WIDTH (not -280) so the initial position matches the panel
   const slideX = useRef(new Animated.Value(-PANEL_WIDTH)).current;
   const backdropOp = useRef(new Animated.Value(0)).current;
   const itemAnims = useRef(ITEMS.map(() => new Animated.Value(0))).current;
   const [mounted, setMounted] = useState(false);
-
-  // FIX 3: Track in-flight animation so we can cancel it on rapid open/close toggles
   const animRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
     if (open) {
-      // Cancel any in-flight close animation
       if (animRef.current) {
         animRef.current.stop();
         animRef.current = null;
       }
 
-      setMounted(true);
-
-      // FIX 4: Reset values synchronously before starting — prevents stale mid-values
-      //         on rapid re-opens
+      // Reset values before mount so the very first paint is already offscreen
       slideX.setValue(-PANEL_WIDTH);
       backdropOp.setValue(0);
       itemAnims.forEach((a) => a.setValue(0));
+      setMounted(true);
 
-      // FIX 5: Use requestAnimationFrame to ensure the component has painted before
-      //         we start stagger animations (avoids invisible first-frame flash)
-      requestAnimationFrame(() => {
-        const slideAndFade = Animated.parallel([
-          Animated.spring(slideX, {
-            toValue: 0,
-            useNativeDriver: true,
-            tension: 90,
-            friction: 14,
-          }),
-          Animated.timing(backdropOp, {
-            toValue: 1,
-            duration: 220,
-            useNativeDriver: true,
-          }),
-        ]);
-
-        const stagger = Animated.stagger(
+      // Start immediately — no rAF delay, which was causing the invisible-frame flash
+      const anim = Animated.parallel([
+        Animated.spring(slideX, {
+          toValue: 0,
+          useNativeDriver: true,
+          tension: 90,
+          friction: 14,
+        }),
+        Animated.timing(backdropOp, {
+          toValue: 1,
+          duration: 220,
+          useNativeDriver: true,
+        }),
+        Animated.stagger(
           55,
           itemAnims.map((a) =>
             Animated.spring(a, {
@@ -163,23 +151,18 @@ function Drawer({ open, onClose, onItemPress, onClosed }: DrawerProps) {
               friction: 12,
             }),
           ),
-        );
-
-        // Run slide/fade first, then stagger items once panel is visible
-        const combined = Animated.parallel([slideAndFade, stagger]);
-        animRef.current = combined;
-        combined.start(({ finished }) => {
-          if (finished) animRef.current = null;
-        });
+        ),
+      ]);
+      animRef.current = anim;
+      anim.start(({ finished }) => {
+        if (finished) animRef.current = null;
       });
     } else {
-      // Cancel any in-flight open animation
       if (animRef.current) {
         animRef.current.stop();
         animRef.current = null;
       }
 
-      // FIX 6: Close target uses -(PANEL_WIDTH + 20) for a clean overshoot exit
       const closeAnim = Animated.parallel([
         Animated.spring(slideX, {
           toValue: -(PANEL_WIDTH + 20),
@@ -220,7 +203,6 @@ function Drawer({ open, onClose, onItemPress, onClosed }: DrawerProps) {
       <Animated.View style={[d.panel, { transform: [{ translateX: slideX }] }]}>
         <SafeAreaView edges={["top", "left", "bottom"]} style={d.panelInner}>
           <View style={d.divider} />
-
           <View style={d.navList}>
             {ITEMS.map((item, i) => {
               const scale = itemAnims[i].interpolate({
@@ -233,7 +215,6 @@ function Drawer({ open, onClose, onItemPress, onClosed }: DrawerProps) {
                 outputRange: [-20, 0],
               });
               const Icon = item.icon;
-
               return (
                 <Animated.View
                   key={item.key}
@@ -254,7 +235,6 @@ function Drawer({ open, onClose, onItemPress, onClosed }: DrawerProps) {
               );
             })}
           </View>
-
           <View style={d.footer}>
             <View style={d.footerDot} />
             <Text style={d.footerText}>v1.0.0</Text>
@@ -285,20 +265,14 @@ const d = StyleSheet.create({
     shadowRadius: 24,
     elevation: 24,
   },
-  panelInner: {
-    flex: 1,
-  },
+  panelInner: { flex: 1 },
   divider: {
     height: 1,
     backgroundColor: COLORS.peach,
     marginHorizontal: 22,
     marginBottom: 14,
   },
-  navList: {
-    flex: 1,
-    paddingHorizontal: 12,
-    gap: 2,
-  },
+  navList: { flex: 1, paddingHorizontal: 12, gap: 2 },
   navItem: {
     flexDirection: "row",
     alignItems: "center",
@@ -353,9 +327,6 @@ export default function BurgerMenu() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [timerOpen, setTimerOpen] = useState(false);
   const btnScale = useRef(new Animated.Value(1)).current;
-  // FIX 7: Use a ref for pendingAction so it's always fresh inside the onClosed closure
-  //         (useState is captured at closure creation time; refs are not)
-  const pendingActionRef = useRef<string | null>(null);
 
   const toggleDrawer = () => {
     Animated.sequence([
@@ -382,8 +353,17 @@ export default function BurgerMenu() {
   };
 
   const handleItemPress = (key: string) => {
-    pendingActionRef.current = key;
+    // Close the drawer immediately
     setDrawerOpen(false);
+
+    // KEY FIX: Open the target modal at the same time as closing the drawer.
+    // The modal's slide-up animation starts concurrently with the drawer sliding out,
+    // so they cross-fade naturally. Waiting for onClosed (after the close animation
+    // finishes) caused a ~200ms gap where nothing was visible — that blank moment
+    // is what made the icon appear to "flash" before the modal arrived.
+    if (key === "timer") {
+      setTimerOpen(true);
+    }
   };
 
   return (
@@ -410,13 +390,6 @@ export default function BurgerMenu() {
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}
         onItemPress={handleItemPress}
-        onClosed={() => {
-          // FIX 8: Read from ref (always current) instead of stale state closure
-          if (pendingActionRef.current === "timer") {
-            setTimerOpen(true);
-          }
-          pendingActionRef.current = null;
-        }}
       />
 
       <TimerModal visible={timerOpen} onClose={() => setTimerOpen(false)} />
@@ -425,15 +398,8 @@ export default function BurgerMenu() {
 }
 
 const m = StyleSheet.create({
-  btnSafe: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    zIndex: 90,
-  },
-  btnWrap: {
-    margin: 16,
-  },
+  btnSafe: { position: "absolute", top: 0, left: 0, zIndex: 90 },
+  btnWrap: { margin: 16 },
   btn: {
     width: 48,
     height: 48,
