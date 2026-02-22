@@ -30,85 +30,76 @@ const C = {
   overlay: "rgba(42,21,16,0.6)",
 };
 
-// ── Snowflake config ──────────────────────────────────────────────
+// ── Snow ─────────────────────────────────────────────────────────
 const FLAKE_COUNT = 28;
 
 interface Flake {
-  x: Animated.Value; // horizontal drift (0..1 of width)
-  y: Animated.Value; // vertical position (0..1 of height)
+  x: Animated.Value;
+  y: Animated.Value;
   opacity: Animated.Value;
   size: number;
   duration: number;
   delay: number;
-  drift: number; // horizontal sway range as fraction of width
-  startX: number; // initial x fraction
+  drift: number;
+  startX: number;
 }
 
 function makeFlakes(): Flake[] {
-  return Array.from({ length: FLAKE_COUNT }, () => {
-    const size = 4 + Math.random() * 7; // 4–11 px diameter
-    const duration = 6000 + Math.random() * 8000; // 6–14 s fall
-    const delay = Math.random() * 10000; // stagger start up to 10 s
-    const startX = Math.random();
-    const drift = 0.04 + Math.random() * 0.06; // gentle sway
-    return {
-      x: new Animated.Value(startX),
-      y: new Animated.Value(-0.05),
-      opacity: new Animated.Value(0),
-      size,
-      duration,
-      delay,
-      drift,
-      startX,
-    };
-  });
+  return Array.from({ length: FLAKE_COUNT }, () => ({
+    x: new Animated.Value(Math.random()),
+    y: new Animated.Value(-0.05),
+    opacity: new Animated.Value(0),
+    size: 4 + Math.random() * 7,
+    duration: 6000 + Math.random() * 8000,
+    delay: Math.random() * 10000,
+    drift: 0.04 + Math.random() * 0.06,
+    startX: Math.random(),
+  }));
 }
 
-function animateFlake(flake: Flake, screenWidth: number, screenHeight: number) {
-  // Reset
+function animateFlake(flake: Flake, w: number, h: number) {
   flake.y.setValue(-0.05);
   flake.x.setValue(flake.startX);
   flake.opacity.setValue(0);
 
-  // Horizontal sway: oscillate around startX
-  const swayDuration = 2500 + Math.random() * 2000;
-  const targetX = flake.startX + (Math.random() > 0.5 ? 1 : -1) * flake.drift;
+  const swayDur = 2500 + Math.random() * 2000;
+  const targetX = Math.max(
+    0,
+    Math.min(1, flake.startX + (Math.random() > 0.5 ? 1 : -1) * flake.drift),
+  );
 
   const sway = Animated.loop(
     Animated.sequence([
       Animated.timing(flake.x, {
-        toValue: Math.max(0, Math.min(1, targetX)),
-        duration: swayDuration,
+        toValue: targetX,
+        duration: swayDur,
         easing: Easing.inOut(Easing.sin),
         useNativeDriver: true,
       }),
       Animated.timing(flake.x, {
         toValue: flake.startX,
-        duration: swayDuration,
+        duration: swayDur,
         easing: Easing.inOut(Easing.sin),
         useNativeDriver: true,
       }),
     ]),
   );
 
-  // Fall + fade in/out
+  const peakOpacity = 0.45 + Math.random() * 0.3;
   const fall = Animated.sequence([
     Animated.delay(flake.delay),
     Animated.parallel([
-      // fade in over first 15% of fall
       Animated.sequence([
         Animated.timing(flake.opacity, {
-          toValue: 0.55 + Math.random() * 0.3,
+          toValue: peakOpacity,
           duration: flake.duration * 0.15,
           useNativeDriver: true,
         }),
-        // hold
         Animated.timing(flake.opacity, {
-          toValue: 0.55 + Math.random() * 0.3,
+          toValue: peakOpacity,
           duration: flake.duration * 0.7,
           useNativeDriver: true,
         }),
-        // fade out last 15%
         Animated.timing(flake.opacity, {
           toValue: 0,
           duration: flake.duration * 0.15,
@@ -128,27 +119,20 @@ function animateFlake(flake: Flake, screenWidth: number, screenHeight: number) {
   fall.start(({ finished }) => {
     if (finished) {
       sway.stop();
-      // Loop with a fresh random delay
       flake.delay = Math.random() * 4000;
       flake.startX = Math.random();
-      animateFlake(flake, screenWidth, screenHeight);
+      animateFlake(flake, w, h);
     }
   });
 }
 
-interface SnowProps {
-  width: number;
-  height: number;
-}
-
-function Snow({ width, height }: SnowProps) {
+function Snow({ width, height }: { width: number; height: number }) {
   const flakesRef = useRef<Flake[]>(makeFlakes());
 
   useEffect(() => {
     const flakes = flakesRef.current;
     flakes.forEach((f) => animateFlake(f, width, height));
     return () => {
-      // Stop all on unmount
       flakes.forEach((f) => {
         f.y.stopAnimation();
         f.x.stopAnimation();
@@ -159,38 +143,40 @@ function Snow({ width, height }: SnowProps) {
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      {flakesRef.current.map((flake, i) => {
-        const translateY = flake.y.interpolate({
-          inputRange: [0, 1],
-          outputRange: [0, height],
-        });
-        const translateX = flake.x.interpolate({
-          inputRange: [0, 1],
-          outputRange: [0, width],
-        });
-        return (
-          <Animated.View
-            key={i}
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              width: flake.size,
-              height: flake.size,
-              borderRadius: flake.size / 2,
-              backgroundColor: C.peachMid,
-              opacity: flake.opacity,
-              transform: [{ translateX }, { translateY }],
-            }}
-          />
-        );
-      })}
+      {flakesRef.current.map((flake, i) => (
+        <Animated.View
+          key={i}
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            width: flake.size,
+            height: flake.size,
+            borderRadius: flake.size / 2,
+            backgroundColor: C.peachMid,
+            opacity: flake.opacity,
+            transform: [
+              {
+                translateX: flake.x.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, width],
+                }),
+              },
+              {
+                translateY: flake.y.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, height],
+                }),
+              },
+            ],
+          }}
+        />
+      ))}
     </View>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────
-
+// ── Timer Modal ───────────────────────────────────────────────────
 export default function TimerModal({ visible, onClose }: TimerModalProps) {
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
@@ -212,6 +198,7 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
   const isOpenRef = useRef(false);
   const openAnimRef = useRef<Animated.CompositeAnimation | null>(null);
 
+  // Open/close sheet
   useEffect(() => {
     if (openAnimRef.current) {
       openAnimRef.current.stop();
@@ -264,6 +251,7 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
     }
   }, [visible]);
 
+  // Re-snap after rotation
   useEffect(() => {
     if (isOpenRef.current && !openAnimRef.current) {
       Animated.spring(slideAnim, {
@@ -275,6 +263,7 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
     }
   }, [width, height]);
 
+  // Pulse while running
   useEffect(() => {
     if (running) {
       const breathe = Animated.loop(
@@ -313,6 +302,7 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
     }
   }, [running]);
 
+  // Tick
   useEffect(() => {
     if (running) {
       intervalRef.current = setInterval(() => setSeconds((s) => s + 1), 1000);
@@ -353,19 +343,24 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
   const mins = Math.floor((seconds % 3600) / 60);
   const secs = seconds % 60;
   const pad = (n: number) => String(n).padStart(2, "0");
-
-  const btnSize = isLandscape ? 52 : 60;
-  const iconSize = isLandscape ? 18 : 21;
   const statusLabel = running ? "Running" : seconds > 0 ? "Paused" : "Ready";
 
+  // Responsive sizing
+  const btnSize = isLandscape ? 50 : 60;
+  const iconSize = isLandscape ? 17 : 21;
+
+  // Digit font: smaller in landscape since card is more compact
   const digitFontSize = isLandscape
-    ? Math.min(height * 0.22, 56)
+    ? Math.min(height * 0.18, 48)
     : Math.min(width * 0.155, 64);
 
   const glowOpacity = glowAnim.interpolate({
     inputRange: [0, 1],
     outputRange: [0, 0.06],
   });
+
+  // Card sizing: in landscape constrain to left half
+  const cardMaxWidth = isLandscape ? width * 0.48 : width - 48;
 
   return (
     <Modal
@@ -388,16 +383,17 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
         barStyle="dark-content"
       />
 
+      {/* Backdrop */}
       <Animated.View style={[s.backdrop, { opacity: backdropAnim }]}>
         <TouchableWithoutFeedback onPress={onClose}>
           <View style={StyleSheet.absoluteFill} />
         </TouchableWithoutFeedback>
       </Animated.View>
 
+      {/* Sheet */}
       <Animated.View
         style={[s.sheet, { transform: [{ translateY: slideAnim }] }]}
       >
-        {/* Snow lives inside the sheet so it's clipped to the modal */}
         <Snow width={width} height={height} />
 
         <SafeAreaView
@@ -421,17 +417,20 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
 
           <View style={s.divider} />
 
-          {/* Body */}
-          <View
-            style={[s.body, isLandscape ? s.bodyLandscape : s.bodyPortrait]}
-          >
-            {/* Time display card */}
+          {/* ── Body: portrait = column, landscape = row ── */}
+          <View style={[s.body, isLandscape ? s.bodyRow : s.bodyColumn]}>
+            {/* Left / top: Time display card */}
             <Animated.View
-              style={[s.card, { transform: [{ scale: pulseAnim }] }]}
+              style={[
+                s.card,
+                { maxWidth: cardMaxWidth, transform: [{ scale: pulseAnim }] },
+                isLandscape && s.cardLandscape,
+              ]}
             >
               <Animated.View style={[s.cardGlow, { opacity: glowOpacity }]} />
 
               <View style={s.timeRow}>
+                {/* HRS */}
                 <View style={s.unit}>
                   <Text style={[s.digit, { fontSize: digitFontSize }]}>
                     {pad(hrs)}
@@ -439,10 +438,11 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
                   <Text style={s.unitLabel}>HRS</Text>
                 </View>
 
-                <Text style={[s.sep, { fontSize: digitFontSize * 0.65 }]}>
+                <Text style={[s.sep, { fontSize: digitFontSize * 0.6 }]}>
                   :
                 </Text>
 
+                {/* MIN */}
                 <View style={s.unit}>
                   <Text style={[s.digit, { fontSize: digitFontSize }]}>
                     {pad(mins)}
@@ -450,10 +450,11 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
                   <Text style={s.unitLabel}>MIN</Text>
                 </View>
 
-                <Text style={[s.sep, { fontSize: digitFontSize * 0.65 }]}>
+                <Text style={[s.sep, { fontSize: digitFontSize * 0.6 }]}>
                   :
                 </Text>
 
+                {/* SEC */}
                 <View style={s.unit}>
                   <Text
                     style={[
@@ -471,13 +472,17 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
               </View>
             </Animated.View>
 
-            {/* Controls */}
+            {/* Divider between card and controls in landscape */}
+            {isLandscape && <View style={s.verticalDivider} />}
+
+            {/* Right / bottom: Controls */}
             <View
               style={[
                 s.controls,
                 isLandscape ? s.controlsLandscape : s.controlsPortrait,
               ]}
             >
+              {/* Button labels — portrait only above row */}
               {!isLandscape && (
                 <View style={s.labelRow}>
                   {["Start", "Pause", "Reset"].map((l) => (
@@ -488,84 +493,71 @@ export default function TimerModal({ visible, onClose }: TimerModalProps) {
                 </View>
               )}
 
+              {/* Buttons: row in portrait, column in landscape */}
               <View
                 style={[
                   s.btnGroup,
-                  isLandscape ? s.btnGroupLandscape : s.btnGroupPortrait,
+                  isLandscape ? s.btnGroupColumn : s.btnGroupRow,
                 ]}
               >
-                <Animated.View style={{ transform: [{ scale: btnScales[0] }] }}>
-                  <TouchableOpacity
-                    onPress={() =>
-                      bouncyPress(btnScales[0], () => setRunning(true))
-                    }
-                    disabled={running}
-                    activeOpacity={0.88}
-                    style={[
-                      s.btn,
-                      {
-                        width: btnSize,
-                        height: btnSize,
-                        borderRadius: btnSize / 2,
-                      },
-                      s.btnPrimary,
-                      running && s.btnDisabled,
-                    ]}
-                  >
-                    <Play size={iconSize} color={C.peach} fill={C.peach} />
-                  </TouchableOpacity>
-                </Animated.View>
-
-                <Animated.View style={{ transform: [{ scale: btnScales[1] }] }}>
-                  <TouchableOpacity
-                    onPress={() =>
-                      bouncyPress(btnScales[1], () => setRunning(false))
-                    }
-                    disabled={!running}
-                    activeOpacity={0.88}
-                    style={[
-                      s.btn,
-                      {
-                        width: btnSize,
-                        height: btnSize,
-                        borderRadius: btnSize / 2,
-                      },
-                      s.btnSecondary,
-                      !running && s.btnDisabled,
-                    ]}
-                  >
-                    <Pause size={iconSize} color={C.dark} fill={C.dark} />
-                  </TouchableOpacity>
-                </Animated.View>
-
-                <Animated.View style={{ transform: [{ scale: btnScales[2] }] }}>
-                  <TouchableOpacity
-                    onPress={() =>
-                      bouncyPress(btnScales[2], () => {
-                        setRunning(false);
-                        setSeconds(0);
-                      })
-                    }
-                    activeOpacity={0.88}
-                    style={[
-                      s.btn,
-                      {
-                        width: btnSize,
-                        height: btnSize,
-                        borderRadius: btnSize / 2,
-                      },
-                      s.btnGhost,
-                    ]}
-                  >
+                {/* Landscape: label to the left of each button */}
+                {(["Start", "Pause", "Reset"] as const).map((label, idx) => {
+                  const icons = [
+                    <Play size={iconSize} color={C.peach} fill={C.peach} />,
+                    <Pause size={iconSize} color={C.dark} fill={C.dark} />,
                     <RotateCcw
                       size={iconSize}
                       color={C.dark}
                       strokeWidth={2.2}
-                    />
-                  </TouchableOpacity>
-                </Animated.View>
+                    />,
+                  ];
+                  const btnStyles = [s.btnPrimary, s.btnSecondary, s.btnGhost];
+                  const disabledCond = [running, !running, false];
+                  const onPresses = [
+                    () => bouncyPress(btnScales[0], () => setRunning(true)),
+                    () => bouncyPress(btnScales[1], () => setRunning(false)),
+                    () =>
+                      bouncyPress(btnScales[2], () => {
+                        setRunning(false);
+                        setSeconds(0);
+                      }),
+                  ];
+
+                  return (
+                    <View
+                      key={label}
+                      style={isLandscape ? s.btnRowWithLabel : undefined}
+                    >
+                      {isLandscape && (
+                        <Text style={s.btnLabelLandscape}>{label}</Text>
+                      )}
+                      <Animated.View
+                        style={{ transform: [{ scale: btnScales[idx] }] }}
+                      >
+                        <TouchableOpacity
+                          onPress={onPresses[idx]}
+                          disabled={disabledCond[idx]}
+                          activeOpacity={0.88}
+                          style={[
+                            s.btn,
+                            {
+                              width: btnSize,
+                              height: btnSize,
+                              borderRadius: btnSize / 2,
+                            },
+                            btnStyles[idx],
+                            disabledCond[idx] && s.btnDisabled,
+                          ]}
+                        >
+                          {icons[idx]}
+                        </TouchableOpacity>
+                      </Animated.View>
+                    </View>
+                  );
+                })}
               </View>
 
+              {/* Status pill */}
               <View style={[s.statusPill, running && s.statusPillActive]}>
                 <View style={[s.statusDot, running && s.statusDotActive]} />
                 <Text style={[s.statusText, running && s.statusTextActive]}>
@@ -598,13 +590,14 @@ const s = StyleSheet.create({
   },
   safeArea: { flex: 1 },
 
+  // Header
   header: {
     paddingTop: 14,
     paddingHorizontal: 24,
     paddingBottom: 0,
     alignItems: "center",
   },
-  headerLandscape: { paddingTop: 8 },
+  headerLandscape: { paddingTop: 6 },
   handle: {
     width: 36,
     height: 4,
@@ -618,7 +611,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
-    marginBottom: 12,
+    marginBottom: 10,
   },
   title: {
     fontFamily: "Georgia",
@@ -644,40 +637,59 @@ const s = StyleSheet.create({
     marginHorizontal: 24,
   },
 
+  // Body layouts
   body: { flex: 1, alignItems: "center", justifyContent: "center" },
-  bodyPortrait: {
+  // Portrait: stack vertically
+  bodyColumn: {
     flexDirection: "column",
-    gap: 44,
-    paddingVertical: 28,
+    gap: 36,
+    paddingVertical: 24,
     paddingHorizontal: 24,
   },
-  bodyLandscape: {
+  // Landscape: side by side
+  bodyRow: {
     flexDirection: "row",
-    gap: 44,
-    paddingVertical: 12,
-    paddingHorizontal: 36,
+    gap: 0,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
   },
 
+  // Vertical separator in landscape
+  verticalDivider: {
+    width: StyleSheet.hairlineWidth,
+    backgroundColor: C.peachMid,
+    marginHorizontal: 28,
+    alignSelf: "stretch",
+    marginVertical: 8,
+  },
+
+  // Card
   card: {
     backgroundColor: C.peach,
-    borderRadius: 32,
-    paddingHorizontal: 28,
-    paddingVertical: 32,
+    borderRadius: 28,
+    paddingHorizontal: 24,
+    paddingVertical: 28,
     alignItems: "center",
     overflow: "hidden",
     shadowColor: C.accent,
     shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.18,
-    shadowRadius: 24,
+    shadowOpacity: 0.16,
+    shadowRadius: 22,
     elevation: 10,
+    alignSelf: "center",
+  },
+  cardLandscape: {
+    flex: 1,
+    alignSelf: "center",
   },
   cardGlow: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: C.accent,
-    borderRadius: 32,
+    borderRadius: 28,
   },
-  timeRow: { flexDirection: "row", alignItems: "center", gap: 4 },
-  unit: { alignItems: "center", gap: 8, minWidth: 72 },
+
+  timeRow: { flexDirection: "row", alignItems: "center", gap: 2 },
+  unit: { alignItems: "center", gap: 6, minWidth: 64 },
   digit: {
     fontFamily: "Georgia",
     fontWeight: "600",
@@ -694,21 +706,45 @@ const s = StyleSheet.create({
     opacity: 0.3,
     textTransform: "uppercase",
   },
-  unitLabelRunning: { color: C.accent, opacity: 0.65 },
+  unitLabelRunning: { color: C.accent, opacity: 0.6 },
   sep: {
     fontFamily: "Georgia",
     fontWeight: "200",
     color: C.peachMid,
-    marginBottom: 18,
+    marginBottom: 16,
     opacity: 0.7,
   },
 
+  // Controls panel
   controls: { alignItems: "center" },
-  controlsPortrait: { gap: 14 },
-  controlsLandscape: { gap: 14, justifyContent: "center" },
+  // Portrait: compact column
+  controlsPortrait: { gap: 12 },
+  // Landscape: centered column taking right half
+  controlsLandscape: { gap: 16, justifyContent: "center", flex: 1 },
+
+  // Button groups
   btnGroup: { alignItems: "center" },
-  btnGroupPortrait: { flexDirection: "row", gap: 20 },
-  btnGroupLandscape: { flexDirection: "column", gap: 14 },
+  btnGroupRow: { flexDirection: "row", gap: 20 }, // portrait
+  btnGroupColumn: {
+    flexDirection: "column",
+    gap: 14,
+    alignItems: "flex-start",
+  }, // landscape
+
+  // Landscape: each button sits in a row with its text label on the left
+  btnRowWithLabel: { flexDirection: "row", alignItems: "center", gap: 14 },
+  btnLabelLandscape: {
+    fontFamily: "Georgia",
+    fontSize: 11,
+    letterSpacing: 1.2,
+    color: C.dark,
+    opacity: 0.38,
+    textTransform: "uppercase",
+    width: 44,
+    textAlign: "right",
+  },
+
+  // Portrait labels above button row
   labelRow: { flexDirection: "row", gap: 20, alignItems: "center" },
   btnLabel: {
     textAlign: "center",
@@ -719,6 +755,8 @@ const s = StyleSheet.create({
     opacity: 0.35,
     textTransform: "uppercase",
   },
+
+  // Buttons
   btn: {
     alignItems: "center",
     justifyContent: "center",
@@ -739,6 +777,7 @@ const s = StyleSheet.create({
   },
   btnDisabled: { opacity: 0.2 },
 
+  // Status pill
   statusPill: {
     flexDirection: "row",
     alignItems: "center",
