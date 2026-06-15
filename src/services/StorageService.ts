@@ -1,4 +1,3 @@
-// services/StorageService.ts
 import DatabaseService from "./DatabaseService";
 
 export interface Folder {
@@ -10,7 +9,6 @@ export interface Folder {
   syncStatus: string;
 }
 
-// services/StorageService.ts (Note interface)
 export interface Note {
   id: string;
   folderId: string | null;
@@ -26,25 +24,18 @@ class StorageService {
   private initialized = false;
   private initializationPromise: Promise<void> | null = null;
 
-  // Initialize database connection with error handling
   async initialize(): Promise<void> {
-    if (this.initialized) {
-      return;
-    }
+    if (this.initialized) return;
 
-    // If initialization is already in progress, wait for it
     if (this.initializationPromise) {
       return this.initializationPromise;
     }
 
     this.initializationPromise = (async () => {
       try {
-        console.log("Initializing StorageService...");
         await DatabaseService.init();
         this.initialized = true;
-        console.log("StorageService initialized successfully");
       } catch (error) {
-        console.error("StorageService initialization failed:", error);
         this.initialized = false;
         this.initializationPromise = null;
         throw error;
@@ -54,7 +45,6 @@ class StorageService {
     return this.initializationPromise;
   }
 
-  // Ensure all data is saved before exit
   async ensureDataSaved(): Promise<void> {
     try {
       await DatabaseService.flush();
@@ -133,49 +123,40 @@ class StorageService {
     }
   }
 
-  // Get notes by folder ID
   async getNotesByFolderId(folderId: string | null): Promise<Note[]> {
     try {
       await this.initialize();
-      const notes = await DatabaseService.getNotes();
-      return notes.filter((note) => note.folderId === folderId);
+      return await DatabaseService.getNotesByFolderId(folderId);
     } catch (error) {
       console.error("Error getting notes by folder ID:", error);
       return [];
     }
   }
 
-  // Get subfolders by parent ID
   async getSubfolders(parentId: string | null): Promise<Folder[]> {
     try {
       await this.initialize();
-      const folders = await DatabaseService.getFolders();
-      return folders.filter((folder) => folder.parentId === parentId);
+      return await DatabaseService.getSubfolders(parentId);
     } catch (error) {
       console.error("Error getting subfolders:", error);
       return [];
     }
   }
 
-  // Get folder by ID
   async getFolderById(id: string): Promise<Folder | null> {
     try {
       await this.initialize();
-      const folders = await DatabaseService.getFolders();
-      return folders.find((folder) => folder.id === id) || null;
+      return await DatabaseService.getFolderById(id);
     } catch (error) {
       console.error("Error getting folder by ID:", error);
       return null;
     }
   }
 
-  // Update folder
   async updateFolder(id: string, updates: Partial<Folder>): Promise<void> {
     try {
       await this.initialize();
-      const folders = await DatabaseService.getFolders();
-      const folder = folders.find((f) => f.id === id);
-
+      const folder = await DatabaseService.getFolderById(id);
       if (!folder) {
         throw new Error(`Folder with id ${id} not found`);
       }
@@ -194,13 +175,10 @@ class StorageService {
     }
   }
 
-  // Update note
   async updateNote(id: string, updates: Partial<Note>): Promise<void> {
     try {
       await this.initialize();
-      const notes = await DatabaseService.getNotes();
-      const note = notes.find((n) => n.id === id);
-
+      const note = await DatabaseService.getNoteById(id);
       if (!note) {
         throw new Error(`Note with id ${id} not found`);
       }
@@ -237,7 +215,6 @@ class StorageService {
         };
       }
 
-      // Get counts from database
       const folders = await this.getFolders();
       const notes = await this.getNotes();
       const pendingItems = await this.getPendingSyncItems();
@@ -259,7 +236,6 @@ class StorageService {
     }
   }
 
-  // Backup and restore methods
   async exportData(): Promise<string> {
     try {
       await this.initialize();
@@ -280,7 +256,6 @@ class StorageService {
     }
   }
 
-  // Get pending sync items
   async getPendingSyncItems(): Promise<any[]> {
     try {
       await this.initialize();
@@ -291,7 +266,6 @@ class StorageService {
     }
   }
 
-  // Clear pending sync item
   async clearPendingSyncItem(id: string): Promise<void> {
     try {
       await this.initialize();
@@ -301,7 +275,6 @@ class StorageService {
     }
   }
 
-  // Clear all pending sync items
   async clearAllPendingSyncItems(): Promise<void> {
     try {
       await this.initialize();
@@ -314,7 +287,6 @@ class StorageService {
     }
   }
 
-  // Get database statistics
   async getDatabaseStats(): Promise<{
     totalNotes: number;
     totalFolders: number;
@@ -327,7 +299,6 @@ class StorageService {
       const folders = await this.getFolders();
       const pendingItems = await this.getPendingSyncItems();
 
-      // Find most recent update
       const allItems = [...notes, ...folders];
       const lastUpdated =
         allItems.length > 0
@@ -351,7 +322,6 @@ class StorageService {
     }
   }
 
-  // Search notes and folders
   async search(query: string): Promise<{
     notes: Note[];
     folders: Folder[];
@@ -383,43 +353,30 @@ class StorageService {
     }
   }
 
-  // Check if storage is ready
   isInitialized(): boolean {
     return this.initialized;
   }
 
-  // Reset storage (for testing/debugging)
   async reset(): Promise<void> {
     try {
-      // Note: This doesn't delete the database file, just clears data
-      // For Expo, we would need a different approach to delete the file
-      console.warn("Reset method not fully implemented for Expo SQLite");
-
-      // Clear all data from tables
       await this.initialize();
-
-      // This is a workaround - in production you might want to handle this differently
       const notes = await this.getNotes();
       const folders = await this.getFolders();
 
-      // Delete all notes
       for (const note of notes) {
         await this.deleteNote(note.id);
       }
 
-      // Delete all folders
       for (const folder of folders) {
         await this.deleteFolder(folder.id);
       }
 
-      // Clear pending sync
       await this.clearAllPendingSyncItems();
     } catch (error) {
       console.error("Error resetting storage:", error);
     }
   }
 
-  // Close database connection (for cleanup)
   async close(): Promise<void> {
     try {
       await DatabaseService.close();

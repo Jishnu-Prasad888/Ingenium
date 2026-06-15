@@ -1,4 +1,3 @@
-// screens/NoteEditorScreen.tsx
 import React, { useState, useEffect, useRef } from "react";
 import {
   View,
@@ -10,233 +9,31 @@ import {
   useWindowDimensions,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
   Keyboard,
+  Modal,
 } from "react-native";
-import { ChevronLeft, Share2, Save, Trash2 } from "lucide-react-native";
+import {
+  ChevronLeft,
+  Share2,
+  Save,
+  Trash2,
+  ExternalLink,
+  Maximize2,
+  CircleX,
+} from "lucide-react-native";
 import { useApp } from "../context/AppContext";
 import DeleteConfirmationPopup from "../components/DeleteConfirmationPopup";
 import { colors } from "../theme/colors";
 import { formatDate } from "../utils/helpers";
-import Markdown from "react-native-markdown-display";
-import { Modal } from "react-native";
-import { ExternalLink, Maximize2, CircleX } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import MoveNoteModal from "../components/MoveNoteModal";
-
-interface MarkdownRendererProps {
-  content: string;
-  onContentChange: (content: string) => void;
-}
-
-const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
-  content,
-  onContentChange,
-}) => {
-  const handleCheckboxToggle = (lineIndex: number) => {
-    const lines = content.split("\n");
-
-    if (lineIndex < 0 || lineIndex >= lines.length) return;
-
-    const line = lines[lineIndex];
-    if (!line) return;
-
-    // Toggle checkbox state - match against the full line, not just trimmed
-    if (/^[\s]*-\s*\[ \]/.test(line)) {
-      // Change from [ ] to [x]
-      lines[lineIndex] = line.replace(/(^[\s]*-\s*)\[ \]/, "$1[x]");
-    } else if (/^[\s]*-\s*\[[xX]\]/.test(line)) {
-      // Change from [x] to [ ]
-      lines[lineIndex] = line.replace(/(^[\s]*-\s*)\[[xX]\]/, "$1[ ]");
-    } else {
-      // Not a checkbox line, do nothing
-      return;
-    }
-
-    // Join back and update content
-    const newContent = lines.join("\n");
-    onContentChange(newContent);
-  };
-
-  const renderContent = () => {
-    const lines = content.split("\n");
-    let inCodeBlock = false;
-    let codeBlockContent = "";
-    const renderedElements: React.ReactNode[] = [];
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-
-      // Handle code blocks
-      if (line.trim().startsWith("```")) {
-        if (!inCodeBlock) {
-          inCodeBlock = true;
-          codeBlockContent = "";
-          continue;
-        } else {
-          inCodeBlock = false;
-          renderedElements.push(
-            <View
-              key={`code-${i}`}
-              style={{
-                backgroundColor: colors.backgroundCard,
-                padding: 12,
-                borderRadius: 8,
-                marginVertical: 8,
-              }}
-            >
-              <Text
-                style={{
-                  fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-                  fontSize: 14,
-                  color: colors.text,
-                }}
-              >
-                {codeBlockContent}
-              </Text>
-            </View>,
-          );
-          continue;
-        }
-      }
-
-      if (inCodeBlock) {
-        codeBlockContent += line + "\n";
-        continue;
-      }
-
-      // Handle checkboxes
-      const trimmedLine = line.trim();
-      const isCheckbox = /^-\s*\[[ xX]\]/.test(trimmedLine);
-
-      if (isCheckbox) {
-        const checkboxMatch = trimmedLine.match(/^-\s*\[([ xX])\]/);
-        const isChecked = checkboxMatch
-          ? checkboxMatch[1].toLowerCase() === "x"
-          : false;
-        const textAfterCheckbox = trimmedLine.replace(/^-\s*\[[ xX]\]\s*/, "");
-        const currentLineIndex = i;
-
-        renderedElements.push(
-          <Pressable
-            key={`checkbox-${i}-${isChecked}`}
-            onPress={() => {
-              console.log("Toggling checkbox at line:", currentLineIndex);
-              handleCheckboxToggle(currentLineIndex);
-            }}
-            style={({ pressed }) => ({
-              flexDirection: "row",
-              alignItems: "flex-start",
-              marginVertical: 4,
-              paddingVertical: 2,
-              opacity: pressed ? 0.6 : 1,
-            })}
-          >
-            <Text
-              style={{
-                fontSize: 18,
-                marginRight: 12,
-                marginTop: 2,
-                color: isChecked ? colors.primary : colors.text,
-              }}
-            >
-              {isChecked ? "☑" : "☐"}
-            </Text>
-            <Text
-              style={{
-                fontSize: 16,
-                lineHeight: 24,
-                flex: 1,
-                color: isChecked ? colors.textSecondary : colors.text,
-                textDecorationLine: isChecked ? "line-through" : "none",
-              }}
-            >
-              {textAfterCheckbox}
-            </Text>
-          </Pressable>,
-        );
-        continue;
-      }
-
-      // Handle normal markdown - collect consecutive non-checkbox, non-code lines
-      let markdownContent = "";
-      let startLine = i;
-      while (
-        i < lines.length &&
-        !lines[i].trim().startsWith("```") &&
-        !/^-\s*\[[ xX]\]/.test(lines[i].trim())
-      ) {
-        markdownContent += lines[i] + "\n";
-        i++;
-      }
-      i--; // Step back one since the loop will increment
-
-      if (markdownContent.trim()) {
-        renderedElements.push(
-          <Markdown
-            key={`md-${startLine}`}
-            style={{
-              body: { color: colors.text, fontSize: 16, lineHeight: 24 },
-              heading1: {
-                fontSize: 28,
-                color: colors.primary,
-                fontWeight: "800" as const,
-                marginTop: 24,
-                marginBottom: 12,
-              },
-              heading2: {
-                fontSize: 24,
-                fontWeight: "700" as const,
-                marginTop: 20,
-                marginBottom: 10,
-              },
-              heading3: {
-                fontSize: 20,
-                fontWeight: "600" as const,
-                marginTop: 16,
-                marginBottom: 8,
-              },
-              bullet_list: { marginVertical: 8, marginLeft: 20 },
-              ordered_list: { marginVertical: 8, marginLeft: 20 },
-              list_item: { marginVertical: 4 },
-              code_inline: {
-                backgroundColor: colors.backgroundCard,
-                paddingHorizontal: 4,
-                paddingVertical: 2,
-                borderRadius: 4,
-                fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
-              },
-              blockquote: {
-                backgroundColor: colors.backgroundCard,
-                borderLeftWidth: 4,
-                borderLeftColor: colors.primary,
-                paddingLeft: 12,
-                paddingVertical: 8,
-                marginVertical: 8,
-              },
-              hr: {
-                backgroundColor: colors.border,
-                height: 1,
-                marginVertical: 16,
-              },
-            }}
-          >
-            {markdownContent}
-          </Markdown>,
-        );
-      }
-    }
-
-    return renderedElements;
-  };
-
-  return <View>{renderContent()}</View>;
-};
+import MarkdownRenderer from "../components/note-editor/MarkdownRenderer";
+import FormatToolbar from "../components/note-editor/FormatToolbar";
+import ActionBar from "../components/note-editor/ActionBar";
 
 const NoteEditorScreen: React.FC = () => {
   const { width } = useWindowDimensions();
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const [bottomBarHeight, setBottomBarHeight] = useState(0);
 
   useEffect(() => {
     const showSub = Keyboard.addListener("keyboardDidShow", () =>
@@ -264,7 +61,6 @@ const NoteEditorScreen: React.FC = () => {
 
   const note = notes.find((n) => n.id === currentNoteId);
 
-  // Local state
   const [isPreview, setIsPreview] = useState(false);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -275,42 +71,6 @@ const NoteEditorScreen: React.FC = () => {
   const [selection, setSelection] = useState({ start: 0, end: 0 });
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showMoveModal, setShowMoveModal] = useState(false);
-  const [showMenu, setShowMenu] = useState(false);
-
-  const handleMove = () => {
-    setShowMoveModal(true);
-    setShowMenu(false);
-  };
-
-  const FormatButton = ({
-    label,
-    onPress,
-  }: {
-    label: string | React.ReactNode;
-    onPress: () => void;
-  }) => (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.7}
-      style={{
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderRadius: 10,
-        backgroundColor: colors.backgroundCard,
-        borderWidth: 1,
-        borderColor: colors.textSecondary,
-        alignItems: "center",
-        justifyContent: "center",
-        minWidth: 30,
-      }}
-    >
-      {typeof label === "string" ? (
-        <Text style={{ color: colors.text, fontWeight: "600" }}>{label}</Text>
-      ) : (
-        label
-      )}
-    </TouchableOpacity>
-  );
 
   const insertMarkdown = (prefix: string, suffix = "") => {
     if (!note) return;
@@ -334,7 +94,6 @@ const NoteEditorScreen: React.FC = () => {
     });
   };
 
-  // Initialize local state when note loads
   useEffect(() => {
     if (note) {
       setTitle(note.title || "");
@@ -344,35 +103,26 @@ const NoteEditorScreen: React.FC = () => {
     }
   }, [note?.id]);
 
-  // Handle delete confirmation
   const handleDeleteConfirm = async () => {
     if (!note) return;
 
-    // Save any pending changes first
     await flushPendingSaves();
-
-    // Delete the note
     const success = await deleteNote(note.id);
 
     if (success) {
-      // Note is deleted, popup will close automatically
-      // Navigation is handled in deleteNote function
     }
 
     setShowDeletePopup(false);
   };
 
-  // Handle delete cancel
   const handleDeleteCancel = () => {
     setShowDeletePopup(false);
   };
 
-  // Handle delete button press
   const handleDeletePress = () => {
     if (!note) return;
 
     if (hasUnsavedChanges) {
-      // Save changes before showing delete confirmation
       flushPendingSaves().then(() => {
         setShowDeletePopup(true);
       });
@@ -406,7 +156,6 @@ const NoteEditorScreen: React.FC = () => {
   };
 
   const handleBack = async () => {
-    // Save any pending changes before navigating away
     await flushPendingSaves();
     setCurrentScreen("notes-list");
   };
@@ -414,7 +163,6 @@ const NoteEditorScreen: React.FC = () => {
   const handleShare = async () => {
     if (!note) return;
 
-    // Ensure all changes are saved before sharing
     await flushPendingSaves();
 
     try {
@@ -427,7 +175,6 @@ const NoteEditorScreen: React.FC = () => {
     }
   };
 
-  // Calculate time since last save
   const getLastSaveText = () => {
     const secondsAgo = Math.floor((Date.now() - lastSavedRef.current) / 1000);
 
@@ -441,7 +188,6 @@ const NoteEditorScreen: React.FC = () => {
     }
   };
 
-  // Handle case where note might not be found
   if (!note) {
     return (
       <View
@@ -480,7 +226,6 @@ const NoteEditorScreen: React.FC = () => {
         paddingTop: 20,
       }}
     >
-      {/* Delete Confirmation Popup */}
       <DeleteConfirmationPopup
         visible={showDeletePopup}
         onConfirm={handleDeleteConfirm}
@@ -490,7 +235,6 @@ const NoteEditorScreen: React.FC = () => {
         itemName={title || "Untitled Note"}
       />
 
-      {/* Save indicator */}
       {hasUnsavedChanges && (
         <View
           style={{
@@ -515,11 +259,8 @@ const NoteEditorScreen: React.FC = () => {
         </View>
       )}
 
-      {/* KeyboardAvoidingView wraps the main content area */}
       <KeyboardAvoidingView
-        style={{
-          flex: 1,
-        }}
+        style={{ flex: 1 }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 88 : 60}
       >
@@ -532,7 +273,6 @@ const NoteEditorScreen: React.FC = () => {
               padding: 10,
             }}
           >
-            {/* Title */}
             <TextInput
               style={{
                 fontSize: 32,
@@ -549,7 +289,6 @@ const NoteEditorScreen: React.FC = () => {
               placeholderTextColor={colors.textSecondary}
             />
 
-            {/* Meta info */}
             <View
               style={{
                 flexDirection: "row",
@@ -559,7 +298,7 @@ const NoteEditorScreen: React.FC = () => {
               }}
             >
               <View>
-                <TouchableOpacity onPress={handleMove}>
+                <TouchableOpacity onPress={() => setShowMoveModal(true)}>
                   <Text style={{ fontSize: 12, color: colors.textSecondary }}>
                     Folder: {folderPath}
                   </Text>
@@ -581,7 +320,6 @@ const NoteEditorScreen: React.FC = () => {
               </View>
             </View>
 
-            {/* Editor container */}
             <View style={{ flex: 1 }}>
               <View
                 style={{
@@ -594,19 +332,10 @@ const NoteEditorScreen: React.FC = () => {
                 }}
               >
                 {isPreview ? (
-                  <ScrollView
-                    showsVerticalScrollIndicator={false}
-                    keyboardShouldPersistTaps="always"
-                    contentContainerStyle={{
-                      padding: 16,
-                      paddingBottom: 120,
-                    }}
-                  >
-                    <MarkdownRenderer
-                      content={content}
-                      onContentChange={handleContentChange}
-                    />
-                  </ScrollView>
+                  <MarkdownRenderer
+                    content={content}
+                    onContentChange={handleContentChange}
+                  />
                 ) : (
                   <ScrollView
                     keyboardShouldPersistTaps="handled"
@@ -643,61 +372,12 @@ const NoteEditorScreen: React.FC = () => {
 
               {!keyboardVisible && (
                 <SafeAreaView>
-                  <View
-                    style={{
-                      backgroundColor: colors.backgroundCard,
-                      borderTopWidth: 1,
-                      borderTopColor: colors.border,
-                      paddingVertical: 8,
-                    }}
-                  >
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={{
-                        paddingHorizontal: 12,
-                        alignItems: "center",
-                        gap: 8,
-                      }}
-                    >
-                      <FormatButton
-                        label={isPreview ? "Edit" : "Preview"}
-                        onPress={() => setIsPreview((p) => !p)}
-                      />
-                      <FormatButton
-                        label={<ExternalLink size={16} color={colors.text} />}
-                        onPress={() => setIsFullscreen(true)}
-                      />
-                      <FormatButton
-                        label="H1"
-                        onPress={() => insertMarkdown("# ")}
-                      />
-                      <FormatButton
-                        label="H2"
-                        onPress={() => insertMarkdown("## ")}
-                      />
-                      <FormatButton
-                        label="H3"
-                        onPress={() => insertMarkdown("### ")}
-                      />
-                      <FormatButton
-                        label="B"
-                        onPress={() => insertMarkdown("**", "**")}
-                      />
-                      <FormatButton
-                        label="I"
-                        onPress={() => insertMarkdown("*", "*")}
-                      />
-                      <FormatButton
-                        label="U"
-                        onPress={() => insertMarkdown("__", "__")}
-                      />
-                      <FormatButton
-                        label="☐"
-                        onPress={() => insertMarkdown("- [ ] ")}
-                      />
-                    </ScrollView>
-                  </View>
+                  <FormatToolbar
+                    isPreview={isPreview}
+                    onTogglePreview={() => setIsPreview((p) => !p)}
+                    onInsertMarkdown={insertMarkdown}
+                    onFullscreen={() => setIsFullscreen(true)}
+                  />
                 </SafeAreaView>
               )}
             </View>
@@ -724,217 +404,24 @@ const NoteEditorScreen: React.FC = () => {
               borderWidth: 1,
             }}
           >
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{
-                paddingHorizontal: 12,
-                alignItems: "center",
-                gap: 8,
-              }}
+            <FormatToolbar
+              isPreview={isPreview}
+              onTogglePreview={() => setIsPreview((p) => !p)}
+              onInsertMarkdown={insertMarkdown}
+              onFullscreen={() => setIsFullscreen(true)}
               keyboardShouldPersistTaps="always"
-            >
-              <FormatButton
-                label={isPreview ? "Edit" : "Preview"}
-                onPress={() => setIsPreview((p) => !p)}
-              />
-              <FormatButton
-                label={<ExternalLink size={16} color={colors.text} />}
-                onPress={() => setIsFullscreen(true)}
-              />
-              <FormatButton label="H1" onPress={() => insertMarkdown("# ")} />
-              <FormatButton label="H2" onPress={() => insertMarkdown("## ")} />
-              <FormatButton label="H3" onPress={() => insertMarkdown("### ")} />
-              <FormatButton
-                label="B"
-                onPress={() => insertMarkdown("**", "**")}
-              />
-              <FormatButton
-                label="I"
-                onPress={() => insertMarkdown("*", "*")}
-              />
-              <FormatButton
-                label="U"
-                onPress={() => insertMarkdown("__", "__")}
-              />
-              <FormatButton
-                label="☐"
-                onPress={() => insertMarkdown("- [ ] ")}
-              />
-            </ScrollView>
+            />
           </View>
         </SafeAreaView>
       )}
 
-      {/* Bottom action buttons - outside KeyboardAvoidingView */}
-      <View
-        style={{
-          position: "absolute",
-          left: 0,
-          right: 0,
-          bottom: 0,
-          paddingHorizontal: 20,
-          paddingTop: 8,
-          paddingBottom: 90, // ← always 90, no conditions
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 8,
-          backgroundColor: colors.background,
-          borderTopWidth: 1,
-          borderTopColor: colors.border,
-          zIndex: 10,
-        }}
-      >
-        {/* Back Button */}
-        <TouchableOpacity
-          style={{
-            flex: 1,
-            backgroundColor: colors.backgroundCard,
-            borderRadius: 12,
-            paddingLeft: 10,
-            paddingRight: 20,
-            height: 40,
-            alignItems: "center",
-            flexDirection: "row",
-            justifyContent: "center",
-            shadowColor: colors.shadow,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 4,
-            elevation: 2,
-          }}
-          onPress={handleBack}
-        >
-          <ChevronLeft size={20} color={colors.text} />
-          {showButtonText && (
-            <Text
-              numberOfLines={1}
-              ellipsizeMode="tail"
-              style={{
-                fontSize: 16,
-                color: colors.text,
-                paddingLeft: 10,
-                textAlign: "center",
-              }}
-            >
-              Back
-            </Text>
-          )}
-        </TouchableOpacity>
-
-        <View
-          style={{
-            width: 3,
-            backgroundColor: colors.primary,
-            opacity: 1,
-            height: 34,
-            borderRadius: 12,
-          }}
-        />
-
-        {/* Delete Button */}
-        <TouchableOpacity
-          style={{
-            width: 60,
-            backgroundColor: colors.backgroundCard,
-            borderRadius: 12,
-            height: 40,
-            alignItems: "center",
-            flexDirection: "row",
-            justifyContent: "center",
-            shadowColor: colors.shadow,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 4,
-            elevation: 2,
-          }}
-          onPress={handleDeletePress}
-        >
-          <Trash2 size={20} color={colors.text} />
-        </TouchableOpacity>
-        <View
-          style={{
-            width: 3,
-            backgroundColor: colors.primary,
-            opacity: 1,
-            height: 34,
-            borderRadius: 12,
-          }}
-        />
-
-        {/* Save Button */}
-        <TouchableOpacity
-          style={{
-            flex: 1,
-            backgroundColor: colors.backgroundCard,
-            borderRadius: 12,
-            paddingLeft: 18,
-            paddingRight: 20,
-            height: 40,
-            alignItems: "center",
-            flexDirection: "row",
-            justifyContent: "center",
-            shadowColor: colors.shadow,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 4,
-            elevation: 2,
-          }}
-          onPress={handleSaveNow}
-        >
-          <Save size={18} color={colors.text} />
-          {showButtonText && (
-            <Text
-              style={{
-                marginLeft: 8,
-                fontSize: 16,
-                color: colors.text,
-              }}
-            >
-              Save
-            </Text>
-          )}
-        </TouchableOpacity>
-
-        <View
-          style={{
-            width: 3,
-            backgroundColor: colors.primary,
-            opacity: 1,
-            height: 34,
-            borderRadius: 12,
-          }}
-        />
-
-        {/* Share Button */}
-        <TouchableOpacity
-          style={{
-            flex: 1,
-            backgroundColor: colors.backgroundCard,
-            borderRadius: 12,
-            paddingLeft: 14,
-            paddingRight: 20,
-            height: 40,
-            alignItems: "center",
-            flexDirection: "row",
-            justifyContent: "center",
-            shadowColor: colors.shadow,
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 4,
-            elevation: 2,
-          }}
-          onPress={handleShare}
-        >
-          <Share2 size={18} color={colors.text} />
-          {showButtonText && (
-            <Text style={{ marginLeft: 8, fontSize: 16, color: colors.text }}>
-              Share
-            </Text>
-          )}
-        </TouchableOpacity>
-      </View>
+      <ActionBar
+        showButtonText={showButtonText}
+        onBack={handleBack}
+        onDelete={handleDeletePress}
+        onSave={handleSaveNow}
+        onShare={handleShare}
+      />
 
       <Modal
         visible={isFullscreen}
@@ -949,7 +436,6 @@ const NoteEditorScreen: React.FC = () => {
             paddingTop: Platform.OS === "ios" ? 60 : 20,
           }}
         >
-          {/* Header */}
           <View
             style={{
               flexDirection: "row",
@@ -968,7 +454,6 @@ const NoteEditorScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Content */}
           <ScrollView
             showsVerticalScrollIndicator={false}
             contentContainerStyle={{
@@ -980,6 +465,7 @@ const NoteEditorScreen: React.FC = () => {
               <MarkdownRenderer
                 content={content}
                 onContentChange={handleContentChange}
+                scrollEnabled={false}
               />
             ) : (
               <Text
@@ -1010,48 +496,3 @@ const NoteEditorScreen: React.FC = () => {
 };
 
 export default NoteEditorScreen;
-
-const styles = {
-  menu: {
-    position: "absolute",
-    top: "100%",
-    right: 10,
-    backgroundColor: colors.background,
-    borderRadius: 8,
-    paddingVertical: 8,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
-    zIndex: 100,
-    minWidth: 150,
-  },
-  menuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  menuText: {
-    marginLeft: 12,
-    fontSize: 14,
-    color: colors.text,
-  },
-  deleteItem: {
-    borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
-  },
-  deleteText: {
-    color: colors.error,
-  },
-  menuButton: {
-    padding: 4,
-  },
-  footer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 8,
-  },
-};

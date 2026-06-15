@@ -1,27 +1,13 @@
-// services/DatabaseService.ts
 import * as SQLite from 'expo-sqlite';
 import { Folder, Note } from './StorageService';
-
-interface SQLResult {
-  insertId?: number;
-  rowsAffected: number;
-  rows: {
-    _array: any[];
-    length: number;
-    item: (index: number) => any;
-  };
-}
 
 class DatabaseService {
   private db: SQLite.SQLiteDatabase | null = null;
   private readonly dbName = 'notes_app.db';
 
-  // Initialize database
   async init(): Promise<void> {
     try {
-      // Open or create database
       this.db = SQLite.openDatabaseSync(this.dbName);
-      
       await this.createTables();
       console.log('Database initialized successfully');
     } catch (error) {
@@ -30,12 +16,10 @@ class DatabaseService {
     }
   }
 
-  // Create tables if they don't exist
   private async createTables(): Promise<void> {
     if (!this.db) return;
 
     try {
-      // Use runAsync for each SQL statement
       await this.db.runAsync(`
         CREATE TABLE IF NOT EXISTS folders (
           id TEXT PRIMARY KEY,
@@ -79,14 +63,12 @@ class DatabaseService {
         CREATE INDEX IF NOT EXISTS idx_folders_parent 
         ON folders(parentId)
       `);
-
     } catch (error) {
       console.error('Error creating tables:', error);
       throw error;
     }
   }
 
-  // Folder operations
   async saveFolder(folder: Folder): Promise<void> {
     if (!this.db) return;
 
@@ -96,8 +78,7 @@ class DatabaseService {
          VALUES (?, ?, ?, ?, ?, ?)`,
         [folder.id, folder.name, folder.parentId, folder.createdAt, folder.updatedAt, folder.syncStatus]
       );
-      
-      // Add to pending sync if not synced
+
       if (folder.syncStatus !== 'synced') {
         await this.addToPendingSync('folders', folder.id, 'INSERT', folder);
       }
@@ -111,12 +92,45 @@ class DatabaseService {
     if (!this.db) return [];
 
     try {
-      const result = await this.db.getAllAsync<Folder>(
+      return await this.db.getAllAsync<Folder>(
         'SELECT * FROM folders ORDER BY createdAt DESC'
       );
-      return result;
     } catch (error) {
       console.error('Error getting folders from database:', error);
+      return [];
+    }
+  }
+
+  async getFolderById(id: string): Promise<Folder | null> {
+    if (!this.db) return null;
+
+    try {
+      const result = await this.db.getFirstAsync<Folder>(
+        'SELECT * FROM folders WHERE id = ?',
+        [id]
+      );
+      return result || null;
+    } catch (error) {
+      console.error('Error getting folder by ID:', error);
+      return null;
+    }
+  }
+
+  async getSubfolders(parentId: string | null): Promise<Folder[]> {
+    if (!this.db) return [];
+
+    try {
+      if (parentId === null) {
+        return await this.db.getAllAsync<Folder>(
+          'SELECT * FROM folders WHERE parentId IS NULL ORDER BY createdAt DESC'
+        );
+      }
+      return await this.db.getAllAsync<Folder>(
+        'SELECT * FROM folders WHERE parentId = ? ORDER BY createdAt DESC',
+        [parentId]
+      );
+    } catch (error) {
+      console.error('Error getting subfolders:', error);
       return [];
     }
   }
@@ -126,11 +140,7 @@ class DatabaseService {
 
     try {
       await this.db.runAsync('DELETE FROM folders WHERE id = ?', [id]);
-      
-      // Add to pending sync
       await this.addToPendingSync('folders', id, 'DELETE', null);
-      
-      // Also delete notes in this folder
       await this.db.runAsync('DELETE FROM notes WHERE folderId = ?', [id]);
     } catch (error) {
       console.error('Error deleting folder from database:', error);
@@ -138,7 +148,6 @@ class DatabaseService {
     }
   }
 
-  // Note operations
   async saveNote(note: Note): Promise<void> {
     if (!this.db) return;
 
@@ -148,8 +157,7 @@ class DatabaseService {
          VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [note.id, note.folderId, note.title, note.content, note.createdAt, note.updatedAt, note.syncStatus]
       );
-      
-      // Add to pending sync if not synced
+
       if (note.syncStatus !== 'synced') {
         await this.addToPendingSync('notes', note.id, 'INSERT', note);
       }
@@ -163,10 +171,9 @@ class DatabaseService {
     if (!this.db) return [];
 
     try {
-      const result = await this.db.getAllAsync<Note>(
+      return await this.db.getAllAsync<Note>(
         'SELECT * FROM notes ORDER BY updatedAt DESC'
       );
-      return result;
     } catch (error) {
       console.error('Error getting notes from database:', error);
       return [];
@@ -181,11 +188,29 @@ class DatabaseService {
         'SELECT * FROM notes WHERE id = ?',
         [id]
       );
-      
       return result || null;
     } catch (error) {
       console.error('Error getting note by ID:', error);
       return null;
+    }
+  }
+
+  async getNotesByFolderId(folderId: string | null): Promise<Note[]> {
+    if (!this.db) return [];
+
+    try {
+      if (folderId === null) {
+        return await this.db.getAllAsync<Note>(
+          'SELECT * FROM notes WHERE folderId IS NULL ORDER BY updatedAt DESC'
+        );
+      }
+      return await this.db.getAllAsync<Note>(
+        'SELECT * FROM notes WHERE folderId = ? ORDER BY updatedAt DESC',
+        [folderId]
+      );
+    } catch (error) {
+      console.error('Error getting notes by folder ID:', error);
+      return [];
     }
   }
 
@@ -194,8 +219,6 @@ class DatabaseService {
 
     try {
       await this.db.runAsync('DELETE FROM notes WHERE id = ?', [id]);
-      
-      // Add to pending sync
       await this.addToPendingSync('notes', id, 'DELETE', null);
     } catch (error) {
       console.error('Error deleting note from database:', error);
@@ -203,11 +226,10 @@ class DatabaseService {
     }
   }
 
-  // Pending sync operations
   private async addToPendingSync(
-    tableName: string, 
-    recordId: string, 
-    operation: string, 
+    tableName: string,
+    recordId: string,
+    operation: string,
     data: any
   ): Promise<void> {
     if (!this.db) return;
@@ -216,7 +238,7 @@ class DatabaseService {
       await this.db.runAsync(
         `INSERT OR REPLACE INTO pending_sync (id, table_name, record_id, operation, data, createdAt) 
          VALUES (?, ?, ?, ?, ?, ?)`,
-        [`${tableName}_${recordId}_${Date.now()}`, tableName, recordId, operation, 
+        [`${tableName}_${recordId}_${Date.now()}`, tableName, recordId, operation,
          data ? JSON.stringify(data) : null, Date.now()]
       );
     } catch (error) {
@@ -231,8 +253,7 @@ class DatabaseService {
       const result = await this.db.getAllAsync<any>(
         'SELECT * FROM pending_sync ORDER BY createdAt ASC'
       );
-      
-      // Parse JSON data
+
       return result.map(item => ({
         ...item,
         data: item.data ? JSON.parse(item.data) : null
@@ -253,14 +274,13 @@ class DatabaseService {
     }
   }
 
-  // Backup and restore
   async exportDatabase(): Promise<string> {
     if (!this.db) return '';
 
     try {
       const folders = await this.getFolders();
       const notes = await this.getNotes();
-      
+
       const backup = {
         folders,
         notes,
@@ -280,30 +300,24 @@ class DatabaseService {
 
     try {
       const data = JSON.parse(jsonData);
-      
-      // Start transaction
+
       await this.db.execAsync('BEGIN TRANSACTION');
-      
+
       try {
-        // Clear existing data
         await this.db.execAsync('DELETE FROM folders');
         await this.db.execAsync('DELETE FROM notes');
         await this.db.execAsync('DELETE FROM pending_sync');
-        
-        // Import folders
+
         for (const folder of data.folders) {
           await this.saveFolder(folder);
         }
-        
-        // Import notes
+
         for (const note of data.notes) {
           await this.saveNote(note);
         }
-        
-        // Commit transaction
+
         await this.db.execAsync('COMMIT');
       } catch (error) {
-        // Rollback on error
         await this.db.execAsync('ROLLBACK');
         throw error;
       }
@@ -313,28 +327,22 @@ class DatabaseService {
     }
   }
 
-  // Ensure all data is saved
   async flush(): Promise<void> {
-    // In Expo SQLite, writes are immediate, so this is mostly for API compatibility
     if (!this.db) return;
-    
+
     try {
       await this.db.execAsync('COMMIT');
     } catch (error) {
-      // Ignore errors - COMMIT might fail if no transaction is active
     }
   }
 
-  // Close database connection
   async close(): Promise<void> {
     if (this.db) {
       await this.flush();
-      // Expo SQLite doesn't have a close method
       this.db = null;
     }
   }
 
-  // Get database file size (for info/debugging)
   async getDatabaseInfo(): Promise<{ size: number; rowCounts: any }> {
     if (!this.db) return { size: 0, rowCounts: {} };
 
@@ -342,17 +350,17 @@ class DatabaseService {
       const foldersCount = await this.db.getFirstAsync<{ count: number }>(
         'SELECT COUNT(*) as count FROM folders'
       );
-      
+
       const notesCount = await this.db.getFirstAsync<{ count: number }>(
         'SELECT COUNT(*) as count FROM notes'
       );
-      
+
       const pendingCount = await this.db.getFirstAsync<{ count: number }>(
         'SELECT COUNT(*) as count FROM pending_sync'
       );
 
       return {
-        size: 0, // Expo doesn't provide file size directly
+        size: 0,
         rowCounts: {
           folders: foldersCount?.count || 0,
           notes: notesCount?.count || 0,

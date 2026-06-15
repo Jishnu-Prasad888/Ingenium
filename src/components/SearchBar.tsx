@@ -1,15 +1,16 @@
 import React from "react";
-import { View, TextInput } from "react-native";
+import { View, TextInput, SafeAreaView } from "react-native";
 import { Search } from "lucide-react-native";
 import { useApp } from "../context/AppContext";
 import { colors } from "../theme/colors";
-import { SafeAreaView } from "react-native";
+import { cardStyles, layoutStyles } from "../theme/styles";
+
 const SearchBar: React.FC = () => {
   const { searchQuery, setSearchQuery } = useApp();
 
   return (
     <SafeAreaView>
-      <View style={{ paddingHorizontal: 20, marginBottom: 12 }}>
+      <View style={[layoutStyles.padH, layoutStyles.mb12]}>
         <View
           style={{
             flexDirection: "row",

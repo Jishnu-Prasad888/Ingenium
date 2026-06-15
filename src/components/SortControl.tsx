@@ -16,11 +16,19 @@ import {
 import { useApp } from "../context/AppContext";
 import { colors } from "../theme/colors";
 import { SafeAreaView } from "react-native";
+import type { SortOption } from "../types";
+
+interface SortOptionItem {
+  key: SortOption;
+  label: string;
+  icon: React.ReactNode;
+}
+
 const SortControl: React.FC = () => {
   const { sortBy, setSortBy } = useApp();
   const [open, setOpen] = useState(false);
 
-  const options = [
+  const options: SortOptionItem[] = [
     {
       key: "date-asc",
       label: "Date",
