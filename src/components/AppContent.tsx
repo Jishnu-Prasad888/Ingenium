@@ -13,6 +13,7 @@ import { colors } from "../theme/colors";
 import DeepLinkHandler from "./DeepLinkHandler";
 import QueryNotesScreen from "../screens/QueryNotesScreen";
 import Whiteboard from "./WhiteBoard";
+import TimerRoutineScreen from "../screens/TimerRoutineScreen";
 
 export const AppContent: React.FC = () => {
   const { currentScreen, isSharing, sharedContent, clearSharedContent } =
@@ -36,7 +37,8 @@ export const AppContent: React.FC = () => {
           {currentScreen === "note-editor" && <NoteEditorScreen />}
           {currentScreen === "query-notes" && <QueryNotesScreen />}
           {currentScreen === "whiteboard" && <Whiteboard />}
-          <BottomNavigationBar />
+          {currentScreen === "timer-routine" && <TimerRoutineScreen />}
+          {currentScreen !== "timer-routine" && <BottomNavigationBar />}
           <SyncIndicator />
         </>
       )}

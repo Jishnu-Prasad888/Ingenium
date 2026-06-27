@@ -6,8 +6,11 @@ import {
   TouchableOpacity,
   Text,
   Animated,
+  Dimensions,
+  Pressable,
+  StyleSheet,
 } from "react-native";
-import { Plus, NotebookPen, Brain } from "lucide-react-native";
+import { Clock3, Menu, X } from "lucide-react-native";
 import { useApp } from "../context/AppContext";
 import Header from "../components/Header";
 import SearchBar from "../components/SearchBar";
@@ -26,14 +29,45 @@ const NotesListScreen: React.FC = () => {
     createWhiteboard,
     getFilteredAndSortedItems,
     queryNotes,
+    setCurrentFolderId,
+    setCurrentNoteId,
+    setCurrentScreen,
   } = useApp();
   const scrollRef = useRef<ScrollView>(null);
-  const [showWhiteboard, setShowWhiteboard] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const drawerProgress = useRef(new Animated.Value(0)).current;
   const allNotes = getFilteredAndSortedItems(notes, "note");
+  const drawerWidth = Math.max(190, Dimensions.get("window").width * 0.5);
+  const drawerTranslateX = drawerProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-drawerWidth, 0],
+  });
+
+  useEffect(() => {
+    Animated.timing(drawerProgress, {
+      toValue: drawerOpen ? 1 : 0,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  }, [drawerOpen, drawerProgress]);
+
+  const openTimerScreen = () => {
+    setDrawerOpen(false);
+    setCurrentFolderId(null);
+    setCurrentNoteId(null);
+    setCurrentScreen("timer-routine");
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Header />
+      <TouchableOpacity
+        accessibilityLabel="Open menu"
+        onPress={() => setDrawerOpen(true)}
+        style={styles.menuButton}
+      >
+        <Menu size={34} color="#FF7A7D" strokeWidth={3} />
+      </TouchableOpacity>
       <SearchBar />
 
       <SortControl />
@@ -67,13 +101,59 @@ const NotesListScreen: React.FC = () => {
       )}
 
       <ScrollToTopButton scrollRef={scrollRef} />
+
+      {drawerOpen && (
+        <View style={StyleSheet.absoluteFill}>
+          <Pressable
+            accessibilityLabel="Close menu"
+            onPress={() => setDrawerOpen(false)}
+            style={[styles.drawerScrim, { left: drawerWidth }]}
+          />
+          <Animated.View
+            style={[
+              styles.drawer,
+              {
+                width: drawerWidth,
+                transform: [{ translateX: drawerTranslateX }],
+              },
+            ]}
+          >
+            <TouchableOpacity
+              accessibilityLabel="Close menu"
+              onPress={() => setDrawerOpen(false)}
+              style={styles.drawerCloseButton}
+            >
+              <X size={34} color="#FF7A7D" strokeWidth={2.6} />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={openTimerScreen}
+              style={styles.drawerItem}
+            >
+              <Clock3 size={24} color={colors.text} />
+              <Text style={styles.drawerItemText}>Timer</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
+      )}
     </View>
   );
 };
 
 export default NotesListScreen;
 
-const styles = {
+const styles = StyleSheet.create({
+  menuButton: {
+    position: "absolute",
+    top: 58,
+    left: 14,
+    zIndex: 10,
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   button: {
     backgroundColor: colors.backgroundCard,
     borderRadius: 12,
@@ -88,4 +168,47 @@ const styles = {
     color: colors.text,
     fontWeight: "500",
   },
-};
+  drawerScrim: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0,0,0,0.05)",
+  },
+  drawer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    bottom: 0,
+    borderRightWidth: 2,
+    borderColor: colors.text,
+    backgroundColor: colors.white,
+    paddingTop: 54,
+    paddingHorizontal: 14,
+    zIndex: 30,
+  },
+  drawerCloseButton: {
+    alignSelf: "flex-end",
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 30,
+  },
+  drawerItem: {
+    minHeight: 50,
+    borderWidth: 2,
+    borderColor: colors.text,
+    borderRadius: 8,
+    backgroundColor: "#FFD4D4",
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  drawerItemText: {
+    color: colors.text,
+    fontSize: 18,
+    fontWeight: "700",
+  },
+});
