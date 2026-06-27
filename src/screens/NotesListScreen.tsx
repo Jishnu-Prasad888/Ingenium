@@ -103,7 +103,7 @@ const NotesListScreen: React.FC = () => {
       <ScrollToTopButton scrollRef={scrollRef} />
 
       {drawerOpen && (
-        <View style={StyleSheet.absoluteFill}>
+        <View style={[StyleSheet.absoluteFill, styles.drawerLayer]}>
           <Pressable
             accessibilityLabel="Close menu"
             onPress={() => setDrawerOpen(false)}
@@ -175,6 +175,10 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: "rgba(0,0,0,0.05)",
   },
+  drawerLayer: {
+    zIndex: 100,
+    elevation: 100,
+  },
   drawer: {
     position: "absolute",
     top: 0,
@@ -185,7 +189,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     paddingTop: 54,
     paddingHorizontal: 14,
-    zIndex: 30,
+    zIndex: 101,
+    elevation: 101,
   },
   drawerCloseButton: {
     alignSelf: "flex-end",
