@@ -16,6 +16,7 @@ import {
   Play,
   Plus,
   RotateCcw,
+  Save,
   Search,
   SkipForward,
   Trash2,
@@ -149,6 +150,7 @@ const TimerRoutineScreen: React.FC = () => {
   const [routineSearchQuery, setRoutineSearchQuery] = useState("");
   const [selectedColorFilter, setSelectedColorFilter] = useState<string | null>(null);
   const [stepTimeDrafts, setStepTimeDrafts] = useState<Record<string, string>>({});
+  const [isEditingRoutine, setIsEditingRoutine] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(5 * 60);
   const [timerRunning, setTimerRunning] = useState(false);
   const [stopwatchSeconds, setStopwatchSeconds] = useState(0);
@@ -292,6 +294,8 @@ const TimerRoutineScreen: React.FC = () => {
     setActiveStepIndex(0);
     setActiveSecondsLeft(routine.steps[0]?.seconds ?? 0);
     setRoutineRunning(false);
+    setIsEditingRoutine(false);
+    setStepTimeDrafts({});
     setRoutineView("detail");
   };
 
@@ -350,6 +354,8 @@ const TimerRoutineScreen: React.FC = () => {
     setActiveStepIndex(0);
     setActiveSecondsLeft(newRoutine.steps[0].seconds);
     setRoutineRunning(false);
+    setIsEditingRoutine(true);
+    setStepTimeDrafts({});
     setRoutineView("detail");
     requestAnimationFrame(() => routineNameInputRef.current?.focus());
   };
@@ -430,6 +436,42 @@ const TimerRoutineScreen: React.FC = () => {
       ...routine,
       color,
     }));
+  };
+
+  const enterRoutineEditMode = () => {
+    setIsEditingRoutine(true);
+    requestAnimationFrame(() => routineNameInputRef.current?.focus());
+  };
+
+  const saveRoutineEdits = () => {
+    const drafts = stepTimeDrafts;
+
+    if (Object.keys(drafts).length > 0) {
+      updateRoutine(selectedRoutine.id, (routine) => ({
+        ...routine,
+        name: routine.name.trim() || "Untitled Routine",
+        steps: routine.steps.map((step) => {
+          const draft = drafts[step.id];
+
+          if (draft === undefined) return step;
+
+          return {
+            ...step,
+            seconds: parseTimerInput(draft, step.seconds),
+            updatedAt: Date.now(),
+            syncStatus: "pending",
+          };
+        }),
+      }));
+      setStepTimeDrafts({});
+    } else if (!selectedRoutine.name.trim()) {
+      updateRoutine(selectedRoutine.id, (routine) => ({
+        ...routine,
+        name: "Untitled Routine",
+      }));
+    }
+
+    setIsEditingRoutine(false);
   };
 
   const deleteStep = (stepId: string) => {
@@ -682,11 +724,15 @@ const TimerRoutineScreen: React.FC = () => {
         </TouchableOpacity>
         <View style={styles.headerActions}>
           <TouchableOpacity
-            accessibilityLabel="Edit routine"
-            onPress={() => routineNameInputRef.current?.focus()}
+            accessibilityLabel={isEditingRoutine ? "Save routine" : "Edit routine"}
+            onPress={isEditingRoutine ? saveRoutineEdits : enterRoutineEditMode}
             style={styles.iconButton}
           >
-            <Edit3 size={24} color={colors.primary} />
+            {isEditingRoutine ? (
+              <Save size={24} color={colors.primary} />
+            ) : (
+              <Edit3 size={24} color={colors.primary} />
+            )}
           </TouchableOpacity>
           <TouchableOpacity
             accessibilityLabel="Delete routine"
@@ -701,9 +747,10 @@ const TimerRoutineScreen: React.FC = () => {
         ref={routineNameInputRef}
         value={selectedRoutine.name}
         onChangeText={updateRoutineName}
+        editable={isEditingRoutine}
         placeholder="Routine name"
         placeholderTextColor={colors.textSecondary}
-        style={styles.detailTitle}
+        style={[styles.detailTitle, !isEditingRoutine && styles.lockedText]}
       />
       <View style={styles.detailColorRow}>
         {routineColors.map((color) => (
@@ -711,10 +758,12 @@ const TimerRoutineScreen: React.FC = () => {
             key={color}
             accessibilityLabel={`Set routine color ${color}`}
             onPress={() => updateRoutineColor(color)}
+            disabled={!isEditingRoutine}
             style={[
               styles.colorDot,
               { backgroundColor: color },
               selectedRoutine.color === color && styles.colorDotActive,
+              !isEditingRoutine && styles.lockedColorDot,
             ]}
           />
         ))}
@@ -725,7 +774,12 @@ const TimerRoutineScreen: React.FC = () => {
             <TextInput
               value={step.name}
               onChangeText={(name) => updateStep(step.id, { name })}
-              style={[styles.stepText, styles.stepNameInput]}
+              editable={isEditingRoutine}
+              style={[
+                styles.stepText,
+                styles.stepNameInput,
+                !isEditingRoutine && styles.lockedText,
+              ]}
             />
             <TextInput
               value={stepTimeDrafts[step.id] ?? formatTime(step.seconds)}
@@ -742,26 +796,35 @@ const TimerRoutineScreen: React.FC = () => {
                   return nextDrafts;
                 });
               }}
+              editable={isEditingRoutine}
               keyboardType="numbers-and-punctuation"
-              style={[styles.stepText, styles.stepTimeInput]}
+              style={[
+                styles.stepText,
+                styles.stepTimeInput,
+                !isEditingRoutine && styles.lockedText,
+              ]}
             />
-            <TouchableOpacity
-              accessibilityLabel="Delete step"
-              onPress={() => deleteStep(step.id)}
-              style={styles.stepIcon}
-            >
-              <Trash2 size={24} color={colors.primary} strokeWidth={2.4} />
-            </TouchableOpacity>
+            {isEditingRoutine && (
+              <TouchableOpacity
+                accessibilityLabel="Delete step"
+                onPress={() => deleteStep(step.id)}
+                style={styles.stepIcon}
+              >
+                <Trash2 size={24} color={colors.primary} strokeWidth={2.4} />
+              </TouchableOpacity>
+            )}
           </View>
         ))}
-        <TouchableOpacity
-          accessibilityLabel="Add timer"
-          onPress={addStep}
-          style={styles.addTimerButton}
-        >
-          <Plus size={16} color={colors.primary} />
-          <Text style={styles.addTimerText}>Timer</Text>
-        </TouchableOpacity>
+        {isEditingRoutine && (
+          <TouchableOpacity
+            accessibilityLabel="Add timer"
+            onPress={addStep}
+            style={styles.addTimerButton}
+          >
+            <Plus size={16} color={colors.primary} />
+            <Text style={styles.addTimerText}>Timer</Text>
+          </TouchableOpacity>
+        )}
       </View>
       {renderControls(
         routineRunning,
@@ -1020,6 +1083,9 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: colors.primary,
   },
+  lockedColorDot: {
+    opacity: 0.72,
+  },
   addRoutineButton: {
     height: 34,
     borderRadius: 10,
@@ -1131,6 +1197,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
     paddingVertical: 0,
+  },
+  lockedText: {
+    opacity: 0.8,
   },
   stepNameInput: {
     flex: 1,
