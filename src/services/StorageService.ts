@@ -46,6 +46,7 @@ export interface Routine {
 class StorageService {
   private initialized = false;
   private initializationPromise: Promise<void> | null = null;
+  private routineSaveQueue: Promise<void> = Promise.resolve();
 
   // Initialize database connection with error handling
   async initialize(): Promise<void> {
@@ -135,13 +136,18 @@ class StorageService {
   }
 
   async saveRoutine(routine: Routine): Promise<void> {
-    try {
-      await this.initialize();
-      await DatabaseService.saveRoutine(routine);
-    } catch (error) {
-      console.error("Error saving routine:", error);
-      throw error;
-    }
+    const saveTask = this.routineSaveQueue.then(async () => {
+      try {
+        await this.initialize();
+        await DatabaseService.saveRoutine(routine);
+      } catch (error) {
+        console.error("Error saving routine:", error);
+        throw error;
+      }
+    });
+
+    this.routineSaveQueue = saveTask.catch(() => undefined);
+    return saveTask;
   }
 
   async deleteFolder(id: string): Promise<void> {

@@ -191,7 +191,9 @@ const TimerRoutineScreen: React.FC = () => {
           return;
         }
 
-        await Promise.all(routineSeed.map((routine) => StorageService.saveRoutine(routine)));
+        for (const routine of routineSeed) {
+          await StorageService.saveRoutine(routine);
+        }
         setRoutines(routineSeed);
         setSelectedRoutineId(routineSeed[0].id);
       } catch (error) {
@@ -611,15 +613,15 @@ const TimerRoutineScreen: React.FC = () => {
             />
           ))}
         </ScrollView>
+        <TouchableOpacity
+          accessibilityLabel="Add new routine"
+          onPress={createRoutine}
+          style={styles.addRoutineButton}
+        >
+          <Plus size={16} color={colors.primary} />
+          <Text style={styles.addRoutineText}>Routine</Text>
+        </TouchableOpacity>
       </View>
-      <TouchableOpacity
-        accessibilityLabel="Add new routine"
-        onPress={createRoutine}
-        style={styles.addRoutineButton}
-      >
-        <Plus size={16} color={colors.primary} />
-        <Text style={styles.addRoutineText}>Routine</Text>
-      </TouchableOpacity>
       <ScrollView
         contentContainerStyle={styles.routineList}
         showsVerticalScrollIndicator={false}
@@ -989,7 +991,7 @@ const styles = StyleSheet.create({
   colorFilterList: {
     alignItems: "center",
     gap: 8,
-    paddingRight: 8,
+    paddingRight: 4,
   },
   clearFilterButton: {
     height: 28,
@@ -1019,11 +1021,9 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   addRoutineButton: {
-    alignSelf: "flex-end",
     height: 34,
     borderRadius: 10,
     paddingHorizontal: 12,
-    marginTop: 6,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",

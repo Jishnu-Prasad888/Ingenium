@@ -87,7 +87,7 @@ class DatabaseService {
           routineId TEXT NOT NULL,
           name TEXT NOT NULL,
           seconds INTEGER NOT NULL,
-          position INTEGER NOT NULL,
+          sortOrder INTEGER NOT NULL,
           createdAt INTEGER NOT NULL,
           updatedAt INTEGER NOT NULL,
           syncStatus TEXT DEFAULT 'synced'
@@ -113,6 +113,57 @@ class DatabaseService {
       console.error('Error creating tables:', error);
       throw error;
     }
+  }
+
+  private async ensureRoutineTables(): Promise<void> {
+    if (!this.db) return;
+
+    await this.db.runAsync(`
+      CREATE TABLE IF NOT EXISTS routines (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
+        color TEXT NOT NULL,
+        createdAt INTEGER NOT NULL,
+        updatedAt INTEGER NOT NULL,
+        syncStatus TEXT DEFAULT 'synced'
+      )
+    `);
+
+    await this.db.runAsync(`
+      CREATE TABLE IF NOT EXISTS routine_steps (
+        id TEXT PRIMARY KEY,
+        routineId TEXT NOT NULL,
+        name TEXT NOT NULL,
+        seconds INTEGER NOT NULL,
+        sortOrder INTEGER NOT NULL,
+        createdAt INTEGER NOT NULL,
+        updatedAt INTEGER NOT NULL,
+        syncStatus TEXT DEFAULT 'synced'
+      )
+    `);
+
+    const columns = await this.db.getAllAsync<{ name: string }>(
+      'PRAGMA table_info(routine_steps)',
+    );
+    const hasSortOrder = columns.some((column) => column.name === 'sortOrder');
+    const hasPosition = columns.some((column) => column.name === 'position');
+
+    if (!hasSortOrder) {
+      await this.db.runAsync(
+        'ALTER TABLE routine_steps ADD COLUMN sortOrder INTEGER DEFAULT 0',
+      );
+    }
+
+    if (!hasPosition) {
+      await this.db.runAsync(
+        'ALTER TABLE routine_steps ADD COLUMN position INTEGER DEFAULT 0',
+      );
+    }
+
+    await this.db.runAsync(`
+      CREATE INDEX IF NOT EXISTS idx_routine_steps_routine 
+      ON routine_steps(routineId)
+    `);
   }
 
   // Folder operations
@@ -236,37 +287,40 @@ class DatabaseService {
     if (!this.db) return;
 
     try {
+      await this.ensureRoutineTables();
+
       await this.db.runAsync(
         `INSERT OR REPLACE INTO routines (id, name, color, createdAt, updatedAt, syncStatus)
          VALUES (?, ?, ?, ?, ?, ?)`,
         [
-          routine.id,
-          routine.name,
-          routine.color,
-          routine.createdAt,
-          routine.updatedAt,
-          routine.syncStatus,
+          String(routine.id),
+          String(routine.name || 'Untitled Routine'),
+          String(routine.color),
+          Number(routine.createdAt || Date.now()),
+          Number(routine.updatedAt || Date.now()),
+          routine.syncStatus || 'pending',
         ],
       );
 
       await this.db.runAsync('DELETE FROM routine_steps WHERE routineId = ?', [
-        routine.id,
+        String(routine.id),
       ]);
 
       for (const step of routine.steps) {
         await this.db.runAsync(
           `INSERT OR REPLACE INTO routine_steps
-           (id, routineId, name, seconds, position, createdAt, updatedAt, syncStatus)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+           (id, routineId, name, seconds, position, sortOrder, createdAt, updatedAt, syncStatus)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
-            step.id,
-            routine.id,
-            step.name,
-            step.seconds,
-            step.position,
-            step.createdAt,
-            step.updatedAt,
-            step.syncStatus,
+            String(step.id),
+            String(step.routineId || routine.id),
+            String(step.name || 'Timer'),
+            Number(step.seconds || 60),
+            Number(step.position || 0),
+            Number(step.position || 0),
+            Number(step.createdAt || Date.now()),
+            Number(step.updatedAt || Date.now()),
+            step.syncStatus || routine.syncStatus || 'pending',
           ],
         );
       }
@@ -284,11 +338,23 @@ class DatabaseService {
     if (!this.db) return [];
 
     try {
+      await this.ensureRoutineTables();
+
       const routines = await this.db.getAllAsync<Omit<Routine, 'steps'>>(
         'SELECT * FROM routines ORDER BY updatedAt DESC',
       );
       const steps = await this.db.getAllAsync<RoutineStep>(
-        'SELECT * FROM routine_steps ORDER BY position ASC',
+        `SELECT
+          id,
+          routineId,
+          name,
+          seconds,
+          sortOrder AS position,
+          createdAt,
+          updatedAt,
+          syncStatus
+        FROM routine_steps
+        ORDER BY sortOrder ASC`,
       );
       const stepsByRoutine = new Map<string, RoutineStep[]>();
 
@@ -312,8 +378,12 @@ class DatabaseService {
     if (!this.db) return;
 
     try {
-      await this.db.runAsync('DELETE FROM routine_steps WHERE routineId = ?', [id]);
-      await this.db.runAsync('DELETE FROM routines WHERE id = ?', [id]);
+      await this.ensureRoutineTables();
+
+      await this.db.runAsync('DELETE FROM routine_steps WHERE routineId = ?', [
+        String(id),
+      ]);
+      await this.db.runAsync('DELETE FROM routines WHERE id = ?', [String(id)]);
 
       await this.addToPendingSync('routines', id, 'DELETE', null);
     } catch (error) {
