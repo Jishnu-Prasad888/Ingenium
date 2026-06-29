@@ -29,9 +29,23 @@ import { colors } from "../theme/colors";
 import { useApp } from "../context/AppContext";
 import StorageService, { Routine, RoutineStep } from "../services/StorageService";
 import { generateSyncId } from "../utils/helpers";
+import DeleteConfirmationPopup from "../components/DeleteConfirmationPopup";
 
 type Mode = "timer" | "routine" | "stopwatch";
 type RoutineView = "list" | "detail" | "active";
+type UndoDelete =
+  | {
+      type: "routine";
+      routine: Routine;
+      message: string;
+    }
+  | {
+      type: "timer";
+      routineId: string;
+      step: RoutineStep;
+      index: number;
+      message: string;
+    };
 
 const routineColors = [
   colors.backgroundFolder,
@@ -158,6 +172,7 @@ const TimerRoutineScreen: React.FC = () => {
   const lastTouchAtRef = useRef(Date.now());
   const celebrationPulse = useRef(new Animated.Value(0)).current;
   const confettiProgress = useRef(new Animated.Value(0)).current;
+  const undoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [mode, setMode] = useState<Mode>("timer");
   const [routineView, setRoutineView] = useState<RoutineView>("list");
   const [routines, setRoutines] = useState<Routine[]>(routineSeed);
@@ -180,6 +195,8 @@ const TimerRoutineScreen: React.FC = () => {
   const [completedRoutineName, setCompletedRoutineName] = useState(
     routineSeed[0].name,
   );
+  const [showDeleteRoutineConfirm, setShowDeleteRoutineConfirm] = useState(false);
+  const [undoDelete, setUndoDelete] = useState<UndoDelete | null>(null);
 
   const selectedRoutine = useMemo(
     () =>
@@ -224,6 +241,12 @@ const TimerRoutineScreen: React.FC = () => {
     };
 
     loadRoutines();
+
+    return () => {
+      if (undoTimeoutRef.current) {
+        clearTimeout(undoTimeoutRef.current);
+      }
+    };
   }, []);
 
   useEffect(() => {
@@ -367,6 +390,63 @@ const TimerRoutineScreen: React.FC = () => {
     saveRoutine(updatedRoutine);
   };
 
+  const showUndoDelete = (nextUndo: UndoDelete) => {
+    if (undoTimeoutRef.current) {
+      clearTimeout(undoTimeoutRef.current);
+    }
+
+    setUndoDelete(nextUndo);
+    undoTimeoutRef.current = setTimeout(() => {
+      setUndoDelete(null);
+      undoTimeoutRef.current = null;
+    }, 3000);
+  };
+
+  const dismissUndoDelete = () => {
+    if (undoTimeoutRef.current) {
+      clearTimeout(undoTimeoutRef.current);
+      undoTimeoutRef.current = null;
+    }
+
+    setUndoDelete(null);
+  };
+
+  const restoreDeletedItem = async () => {
+    if (!undoDelete) return;
+
+    const itemToRestore = undoDelete;
+    dismissUndoDelete();
+
+    if (itemToRestore.type === "routine") {
+      setRoutines((current) => [itemToRestore.routine, ...current]);
+      setSelectedRoutineId(itemToRestore.routine.id);
+      setActiveStepIndex(0);
+      setActiveSecondsLeft(itemToRestore.routine.steps[0]?.seconds ?? 0);
+      await saveRoutine({
+        ...itemToRestore.routine,
+        updatedAt: Date.now(),
+        syncStatus: "pending",
+      });
+      setRoutineView("detail");
+      return;
+    }
+
+    updateRoutine(itemToRestore.routineId, (routine) => {
+      const steps = [...routine.steps];
+      steps.splice(itemToRestore.index, 0, itemToRestore.step);
+
+      return {
+        ...routine,
+        steps: steps.map((step, index) => ({
+          ...step,
+          position: index,
+          updatedAt: Date.now(),
+          syncStatus: "pending",
+        })),
+      };
+    });
+  };
+
   const openRoutine = (routine: Routine) => {
     setSelectedRoutineId(routine.id);
     setActiveStepIndex(0);
@@ -451,6 +531,7 @@ const TimerRoutineScreen: React.FC = () => {
     if (!selectedRoutine) return;
 
     try {
+      const routineToDelete = selectedRoutine;
       await StorageService.deleteRoutine(selectedRoutine.id);
       const remainingRoutines = routines.filter(
         (routine) => routine.id !== selectedRoutine.id,
@@ -465,6 +546,12 @@ const TimerRoutineScreen: React.FC = () => {
 
       setRoutineRunning(false);
       setRoutineView("list");
+      setShowDeleteRoutineConfirm(false);
+      showUndoDelete({
+        type: "routine",
+        routine: routineToDelete,
+        message: "Routine deleted",
+      });
     } catch (error) {
       console.error("Error deleting routine:", error);
       Alert.alert("Delete failed", "Could not delete this routine.");
@@ -567,6 +654,10 @@ const TimerRoutineScreen: React.FC = () => {
       return;
     }
 
+    const deletedStep = selectedRoutine.steps.find((step) => step.id === stepId);
+    const deletedIndex = selectedRoutine.steps.findIndex((step) => step.id === stepId);
+    if (!deletedStep || deletedIndex < 0) return;
+
     updateRoutine(selectedRoutine.id, (routine) =>
       ({
         ...routine,
@@ -580,6 +671,13 @@ const TimerRoutineScreen: React.FC = () => {
           })),
       }),
     );
+    showUndoDelete({
+      type: "timer",
+      routineId: selectedRoutine.id,
+      step: deletedStep,
+      index: deletedIndex,
+      message: "Timer deleted",
+    });
   };
 
   const renderAppTopBar = (title: string) => (
@@ -823,7 +921,7 @@ const TimerRoutineScreen: React.FC = () => {
           </TouchableOpacity>
           <TouchableOpacity
             accessibilityLabel="Delete routine"
-            onPress={deleteRoutine}
+            onPress={() => setShowDeleteRoutineConfirm(true)}
             style={styles.iconButton}
           >
             <Trash2 size={26} color={colors.primary} strokeWidth={2.5} />
@@ -1057,6 +1155,25 @@ const TimerRoutineScreen: React.FC = () => {
     return renderRoutineList();
   };
 
+  const renderUndoSnackbar = () => {
+    if (!undoDelete) return null;
+
+    return (
+      <View style={styles.snackbar}>
+        <Text numberOfLines={1} style={styles.snackbarText}>
+          {undoDelete.message}
+        </Text>
+        <TouchableOpacity
+          accessibilityLabel="Restore deleted item"
+          onPress={restoreDeletedItem}
+          style={styles.snackbarAction}
+        >
+          <Text style={styles.snackbarActionText}>Restore</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView
       onTouchStart={() => {
@@ -1068,6 +1185,16 @@ const TimerRoutineScreen: React.FC = () => {
       {!routineCompleteVisible && mode === "timer" && renderTimer()}
       {!routineCompleteVisible && mode === "routine" && renderRoutine()}
       {!routineCompleteVisible && mode === "stopwatch" && renderStopwatch()}
+      {renderUndoSnackbar()}
+      <DeleteConfirmationPopup
+        visible={showDeleteRoutineConfirm}
+        onCancel={() => setShowDeleteRoutineConfirm(false)}
+        onConfirm={deleteRoutine}
+        title="Delete routine?"
+        message="This routine and its timers will be removed."
+        itemName={selectedRoutine.name || "Untitled Routine"}
+        warning="You can restore it for 3 seconds."
+      />
     </SafeAreaView>
   );
 };
@@ -1523,6 +1650,44 @@ const styles = StyleSheet.create({
   completeButtonText: {
     color: "#166534",
     fontSize: 14,
+    fontWeight: "700",
+  },
+  snackbar: {
+    position: "absolute",
+    left: 20,
+    right: 20,
+    bottom: 28,
+    minHeight: 48,
+    borderRadius: 12,
+    backgroundColor: colors.text,
+    paddingHorizontal: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.28,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  snackbarText: {
+    flex: 1,
+    minWidth: 0,
+    color: colors.white,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  snackbarAction: {
+    minHeight: 34,
+    borderRadius: 9,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.backgroundCard,
+  },
+  snackbarActionText: {
+    color: colors.primary,
+    fontSize: 13,
     fontWeight: "700",
   },
   upNextLine: {

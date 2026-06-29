@@ -18,6 +18,7 @@ interface Props {
   title?: string;
   message?: string;
   itemName?: string;
+  warning?: string;
 }
 
 const DeleteConfirmationPopup: React.FC<Props> = ({
@@ -27,6 +28,7 @@ const DeleteConfirmationPopup: React.FC<Props> = ({
   title = "Delete item?",
   message = "This action will permanently remove the item.",
   itemName,
+  warning = "This action cannot be undone.",
 }) => {
   const scale = useRef(new Animated.Value(0.92)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -89,7 +91,7 @@ const DeleteConfirmationPopup: React.FC<Props> = ({
             </View>
           )}
 
-          <Text style={styles.warning}>This action cannot be undone.</Text>
+          <Text style={styles.warning}>{warning}</Text>
 
           <View style={styles.actions}>
             <AnimatedButton
