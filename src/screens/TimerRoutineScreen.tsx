@@ -524,9 +524,10 @@ const styles = StyleSheet.create({
   },
   topTitle: {
     flex: 1,
-    color: colors.text,
-    fontSize: 30,
-    fontWeight: "700",
+    color: colors.primary,
+    fontFamily: "serif",
+    fontSize: 24,
+    fontWeight: "500",
     textAlign: "center",
   },
   detailTopBar: {
@@ -573,8 +574,8 @@ const styles = StyleSheet.create({
   },
   timeText: {
     color: colors.text,
-    fontSize: 25,
-    fontWeight: "700",
+    fontSize: 24,
+    fontWeight: "600",
   },
   controls: {
     minHeight: 98,
@@ -625,8 +626,8 @@ const styles = StyleSheet.create({
   },
   modeTabText: {
     color: colors.text,
-    fontSize: 15,
-    fontWeight: "700",
+    fontSize: 12,
+    fontWeight: "600",
   },
   routineList: {
     paddingTop: 16,
@@ -649,9 +650,10 @@ const styles = StyleSheet.create({
   },
   routineName: {
     flex: 1,
-    color: colors.text,
-    fontSize: 23,
-    fontWeight: "700",
+    color: colors.primary,
+    fontFamily: "serif",
+    fontSize: 15,
+    fontWeight: "500",
     marginRight: 10,
   },
   routineActions: {
@@ -667,14 +669,16 @@ const styles = StyleSheet.create({
   },
   helperText: {
     color: colors.text,
-    fontSize: 11,
+    fontFamily: "serif",
+    fontSize: 9,
     textAlign: "center",
     marginBottom: 18,
   },
   detailTitle: {
-    color: colors.text,
-    fontSize: 24,
-    fontWeight: "700",
+    color: colors.primary,
+    fontFamily: "serif",
+    fontSize: 17,
+    fontWeight: "500",
     textAlign: "center",
     marginBottom: 28,
   },
@@ -695,8 +699,8 @@ const styles = StyleSheet.create({
   },
   stepText: {
     color: colors.text,
-    fontSize: 19,
-    fontWeight: "700",
+    fontSize: 14,
+    fontWeight: "500",
     paddingVertical: 0,
   },
   stepNameInput: {
@@ -726,8 +730,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
     textAlignVertical: "center",
     color: colors.text,
-    fontSize: 20,
-    fontWeight: "700",
+    fontSize: 15,
+    fontWeight: "600",
     paddingHorizontal: 12,
   },
   nextStep: {
@@ -738,8 +742,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
     textAlignVertical: "center",
     color: colors.text,
-    fontSize: 20,
-    fontWeight: "700",
+    fontSize: 15,
+    fontWeight: "600",
     paddingHorizontal: 12,
   },
   upNextLine: {
@@ -755,8 +759,8 @@ const styles = StyleSheet.create({
   },
   upNextLabel: {
     color: colors.text,
-    fontSize: 17,
-    fontWeight: "700",
+    fontSize: 12,
+    fontWeight: "600",
   },
 });
 
