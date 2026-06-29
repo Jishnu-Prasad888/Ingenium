@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,68 +14,100 @@ import {
   Edit3,
   Pause,
   Play,
+  Plus,
   RotateCcw,
+  Search,
   SkipForward,
   Trash2,
+  X,
 } from "lucide-react-native";
 import { colors } from "../theme/colors";
 import { useApp } from "../context/AppContext";
+import StorageService, { Routine, RoutineStep } from "../services/StorageService";
+import { generateSyncId } from "../utils/helpers";
 
 type Mode = "timer" | "routine" | "stopwatch";
 type RoutineView = "list" | "detail" | "active";
 
-type RoutineStep = {
-  id: string;
-  name: string;
-  seconds: number;
-};
+const routineColors = [
+  colors.backgroundFolder,
+  colors.backgroundCard,
+  "#FDE68A",
+  "#BBF7D0",
+  "#BFDBFE",
+  "#FBCFE8",
+];
 
-type Routine = {
-  id: string;
-  name: string;
-  color: string;
-  steps: RoutineStep[];
-};
+const seedTimestamp = 1700000000000;
+
+const makeSeedStep = (
+  routineId: string,
+  id: string,
+  name: string,
+  seconds: number,
+  position: number,
+): RoutineStep => ({
+  id,
+  routineId,
+  name,
+  seconds,
+  position,
+  createdAt: seedTimestamp,
+  updatedAt: seedTimestamp,
+  syncStatus: "synced",
+});
 
 const routineSeed: Routine[] = [
   {
     id: "focus",
     name: "Focus Warmup",
     color: colors.backgroundFolder,
+    createdAt: seedTimestamp,
+    updatedAt: seedTimestamp,
+    syncStatus: "synced",
     steps: [
-      { id: "breathe", name: "Breathe", seconds: 60 },
-      { id: "plan", name: "Plan", seconds: 180 },
-      { id: "deep", name: "Deep Work", seconds: 900 },
+      makeSeedStep("focus", "breathe", "Breathe", 60, 0),
+      makeSeedStep("focus", "plan", "Plan", 180, 1),
+      makeSeedStep("focus", "deep", "Deep Work", 900, 2),
     ],
   },
   {
     id: "stretch",
     name: "Desk Stretch",
     color: colors.backgroundCard,
+    createdAt: seedTimestamp + 1,
+    updatedAt: seedTimestamp + 1,
+    syncStatus: "synced",
     steps: [
-      { id: "neck", name: "Neck", seconds: 45 },
-      { id: "shoulder", name: "Shoulders", seconds: 60 },
-      { id: "hands", name: "Hands", seconds: 45 },
+      makeSeedStep("stretch", "neck", "Neck", 45, 0),
+      makeSeedStep("stretch", "shoulder", "Shoulders", 60, 1),
+      makeSeedStep("stretch", "hands", "Hands", 45, 2),
     ],
   },
   {
     id: "reset",
     name: "Quick Reset",
     color: colors.backgroundFolder,
+    createdAt: seedTimestamp + 2,
+    updatedAt: seedTimestamp + 2,
+    syncStatus: "synced",
     steps: [
-      { id: "walk", name: "Walk", seconds: 120 },
-      { id: "water", name: "Water", seconds: 30 },
-      { id: "return", name: "Return", seconds: 30 },
+      makeSeedStep("reset", "walk", "Walk", 120, 0),
+      makeSeedStep("reset", "water", "Water", 30, 1),
+      makeSeedStep("reset", "return", "Return", 30, 2),
     ],
   },
   {
     id: "evening",
     name: "Evening Close",
     color: colors.backgroundCard,
+    createdAt: seedTimestamp + 3,
+    updatedAt: seedTimestamp + 3,
+    syncStatus: "synced",
     steps: [
-      { id: "review", name: "Review", seconds: 300 },
-      { id: "clean", name: "Clean Up", seconds: 180 },
-      { id: "tomorrow", name: "Tomorrow", seconds: 120 },
+      makeSeedStep("evening", "review", "Review", 300, 0),
+      makeSeedStep("evening", "clean", "Clean Up", 180, 1),
+      makeSeedStep("evening", "tomorrow", "Tomorrow", 120, 2),
     ],
   },
 ];
@@ -90,12 +123,32 @@ const formatTime = (totalSeconds: number) => {
     .join(":");
 };
 
+const parseTimerInput = (value: string, fallbackSeconds: number) => {
+  const trimmed = value.trim();
+  if (!trimmed) return fallbackSeconds;
+
+  if (!trimmed.includes(":")) {
+    const seconds = Number(trimmed);
+    return Number.isFinite(seconds) && seconds > 0 ? seconds : fallbackSeconds;
+  }
+
+  const pieces = trimmed.split(":").map((piece) => Number(piece) || 0);
+  if (pieces.length !== 3) return fallbackSeconds;
+
+  const seconds = pieces[0] * 3600 + pieces[1] * 60 + pieces[2];
+  return seconds > 0 ? seconds : fallbackSeconds;
+};
+
 const TimerRoutineScreen: React.FC = () => {
   const { setCurrentScreen } = useApp();
+  const routineNameInputRef = useRef<TextInput>(null);
   const [mode, setMode] = useState<Mode>("timer");
   const [routineView, setRoutineView] = useState<RoutineView>("list");
   const [routines, setRoutines] = useState<Routine[]>(routineSeed);
   const [selectedRoutineId, setSelectedRoutineId] = useState(routineSeed[0].id);
+  const [routineSearchQuery, setRoutineSearchQuery] = useState("");
+  const [selectedColorFilter, setSelectedColorFilter] = useState<string | null>(null);
+  const [stepTimeDrafts, setStepTimeDrafts] = useState<Record<string, string>>({});
   const [timerSeconds, setTimerSeconds] = useState(5 * 60);
   const [timerRunning, setTimerRunning] = useState(false);
   const [stopwatchSeconds, setStopwatchSeconds] = useState(0);
@@ -107,12 +160,47 @@ const TimerRoutineScreen: React.FC = () => {
   const [routineRunning, setRoutineRunning] = useState(false);
 
   const selectedRoutine = useMemo(
-    () => routines.find((routine) => routine.id === selectedRoutineId) ?? routines[0],
+    () =>
+      routines.find((routine) => routine.id === selectedRoutineId) ??
+      routines[0] ??
+      routineSeed[0],
     [routines, selectedRoutineId],
   );
 
   const activeStep = selectedRoutine.steps[activeStepIndex];
   const upcomingStep = selectedRoutine.steps[activeStepIndex + 1];
+  const filteredRoutines = useMemo(() => {
+    const searchLower = routineSearchQuery.trim().toLowerCase();
+
+    return routines.filter((routine) => {
+      const matchesSearch =
+        !searchLower || routine.name.toLowerCase().includes(searchLower);
+      const matchesColor = !selectedColorFilter || routine.color === selectedColorFilter;
+      return matchesSearch && matchesColor;
+    });
+  }, [routines, routineSearchQuery, selectedColorFilter]);
+
+  useEffect(() => {
+    const loadRoutines = async () => {
+      try {
+        const storedRoutines = await StorageService.getRoutines();
+
+        if (storedRoutines.length > 0) {
+          setRoutines(storedRoutines);
+          setSelectedRoutineId(storedRoutines[0].id);
+          return;
+        }
+
+        await Promise.all(routineSeed.map((routine) => StorageService.saveRoutine(routine)));
+        setRoutines(routineSeed);
+        setSelectedRoutineId(routineSeed[0].id);
+      } catch (error) {
+        console.error("Error loading routines:", error);
+      }
+    };
+
+    loadRoutines();
+  }, []);
 
   useEffect(() => {
     if (!timerRunning) return;
@@ -168,6 +256,35 @@ const TimerRoutineScreen: React.FC = () => {
     }
   };
 
+  const saveRoutine = async (routine: Routine) => {
+    try {
+      await StorageService.saveRoutine(routine);
+    } catch (error) {
+      console.error("Error saving routine:", error);
+    }
+  };
+
+  const updateRoutine = (
+    routineId: string,
+    updater: (routine: Routine) => Routine,
+  ) => {
+    const currentRoutine = routines.find((routine) => routine.id === routineId);
+    if (!currentRoutine) return;
+
+    const updatedRoutine: Routine = {
+      ...updater(currentRoutine),
+      updatedAt: Date.now(),
+      syncStatus: "pending",
+    };
+
+    setRoutines((current) =>
+      current.map((routine) =>
+        routine.id === routineId ? updatedRoutine : routine,
+      ),
+    );
+    saveRoutine(updatedRoutine);
+  };
+
   const openRoutine = (routine: Routine) => {
     setSelectedRoutineId(routine.id);
     setActiveStepIndex(0);
@@ -201,34 +318,136 @@ const TimerRoutineScreen: React.FC = () => {
     }
   };
 
+  const createRoutine = async () => {
+    const now = Date.now();
+    const routineId = generateSyncId();
+    const newRoutine: Routine = {
+      id: routineId,
+      name: "Untitled Routine",
+      color: selectedColorFilter ?? routineColors[0],
+      createdAt: now,
+      updatedAt: now,
+      syncStatus: "pending",
+      steps: [
+        {
+          id: generateSyncId(),
+          routineId,
+          name: "Timer 1",
+          seconds: 60,
+          position: 0,
+          createdAt: now,
+          updatedAt: now,
+          syncStatus: "pending",
+        },
+      ],
+    };
+
+    setRoutines((current) => [newRoutine, ...current]);
+    await saveRoutine(newRoutine);
+    setSelectedRoutineId(newRoutine.id);
+    setActiveStepIndex(0);
+    setActiveSecondsLeft(newRoutine.steps[0].seconds);
+    setRoutineRunning(false);
+    setRoutineView("detail");
+    requestAnimationFrame(() => routineNameInputRef.current?.focus());
+  };
+
+  const deleteRoutine = async () => {
+    if (!selectedRoutine) return;
+
+    try {
+      await StorageService.deleteRoutine(selectedRoutine.id);
+      const remainingRoutines = routines.filter(
+        (routine) => routine.id !== selectedRoutine.id,
+      );
+      setRoutines(remainingRoutines);
+
+      if (remainingRoutines.length > 0) {
+        setSelectedRoutineId(remainingRoutines[0].id);
+        setActiveStepIndex(0);
+        setActiveSecondsLeft(remainingRoutines[0].steps[0]?.seconds ?? 0);
+      }
+
+      setRoutineRunning(false);
+      setRoutineView("list");
+    } catch (error) {
+      console.error("Error deleting routine:", error);
+      Alert.alert("Delete failed", "Could not delete this routine.");
+    }
+  };
+
   const updateStep = (
     stepId: string,
     updates: Partial<Pick<RoutineStep, "name" | "seconds">>,
   ) => {
-    setRoutines((current) =>
-      current.map((routine) =>
-        routine.id === selectedRoutine.id
+    updateRoutine(selectedRoutine.id, (routine) => ({
+      ...routine,
+      steps: routine.steps.map((step) =>
+        step.id === stepId
           ? {
-              ...routine,
-              steps: routine.steps.map((step) =>
-                step.id === stepId ? { ...step, ...updates } : step,
-              ),
+              ...step,
+              ...updates,
+              updatedAt: Date.now(),
+              syncStatus: "pending",
             }
-          : routine,
+          : step,
       ),
-    );
+    }));
+  };
+
+  const addStep = () => {
+    const now = Date.now();
+
+    updateRoutine(selectedRoutine.id, (routine) => ({
+      ...routine,
+      steps: [
+        ...routine.steps,
+        {
+          id: generateSyncId(),
+          routineId: routine.id,
+          name: `Timer ${routine.steps.length + 1}`,
+          seconds: 60,
+          position: routine.steps.length,
+          createdAt: now,
+          updatedAt: now,
+          syncStatus: "pending",
+        },
+      ],
+    }));
+  };
+
+  const updateRoutineName = (name: string) => {
+    updateRoutine(selectedRoutine.id, (routine) => ({
+      ...routine,
+      name,
+    }));
+  };
+
+  const updateRoutineColor = (color: string) => {
+    updateRoutine(selectedRoutine.id, (routine) => ({
+      ...routine,
+      color,
+    }));
   };
 
   const deleteStep = (stepId: string) => {
-    setRoutines((current) =>
-      current.map((routine) =>
-        routine.id === selectedRoutine.id
-          ? {
-              ...routine,
-              steps: routine.steps.filter((step) => step.id !== stepId),
-            }
-          : routine,
-      ),
+    if (selectedRoutine.steps.length <= 1) {
+      Alert.alert("Keep one timer", "A routine needs at least one timer.");
+      return;
+    }
+
+    updateRoutine(selectedRoutine.id, (routine) =>
+      ({
+        ...routine,
+        steps: routine.steps
+          .filter((step) => step.id !== stepId)
+          .map((step, index) => ({
+            ...step,
+            position: index,
+            updatedAt: Date.now(),
+            syncStatus: "pending",
+          })),
+      }),
     );
   };
 
@@ -344,20 +563,82 @@ const TimerRoutineScreen: React.FC = () => {
   const renderRoutineList = () => (
     <View style={styles.screenBody}>
       {renderAppTopBar("Routines")}
+      <View style={styles.routineSearchBar}>
+        <Search size={17} color={colors.textSecondary} />
+        <TextInput
+          value={routineSearchQuery}
+          onChangeText={setRoutineSearchQuery}
+          placeholder="Search routines"
+          placeholderTextColor={colors.textSecondary}
+          style={styles.routineSearchInput}
+        />
+        {!!routineSearchQuery && (
+          <TouchableOpacity
+            accessibilityLabel="Clear routine search"
+            onPress={() => setRoutineSearchQuery("")}
+            style={styles.clearSearchButton}
+          >
+            <X size={15} color={colors.textSecondary} />
+          </TouchableOpacity>
+        )}
+      </View>
+      <View style={styles.colorFilterRow}>
+        <TouchableOpacity
+          accessibilityLabel="Show all routines"
+          onPress={() => setSelectedColorFilter(null)}
+          style={[
+            styles.clearFilterButton,
+            !selectedColorFilter && styles.clearFilterButtonActive,
+          ]}
+        >
+          <Text style={styles.clearFilterText}>Clear</Text>
+        </TouchableOpacity>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.colorFilterList}
+        >
+          {routineColors.map((color) => (
+            <TouchableOpacity
+              key={color}
+              accessibilityLabel={`Filter ${color} routines`}
+              onPress={() => setSelectedColorFilter(color)}
+              style={[
+                styles.colorDot,
+                { backgroundColor: color },
+                selectedColorFilter === color && styles.colorDotActive,
+              ]}
+            />
+          ))}
+        </ScrollView>
+      </View>
+      <TouchableOpacity
+        accessibilityLabel="Add new routine"
+        onPress={createRoutine}
+        style={styles.addRoutineButton}
+      >
+        <Plus size={16} color={colors.primary} />
+        <Text style={styles.addRoutineText}>Routine</Text>
+      </TouchableOpacity>
       <ScrollView
         contentContainerStyle={styles.routineList}
         showsVerticalScrollIndicator={false}
       >
-        {routines.map((routine) => (
+        {filteredRoutines.map((routine) => (
           <TouchableOpacity
             key={routine.id}
             activeOpacity={0.85}
             onPress={() => openRoutine(routine)}
             style={[styles.routineCard, { backgroundColor: routine.color }]}
           >
-            <Text numberOfLines={1} style={styles.routineName}>
-              {routine.name}
-            </Text>
+            <View style={styles.routineSummary}>
+              <Text numberOfLines={1} style={styles.routineName}>
+                {routine.name || "Untitled Routine"}
+              </Text>
+              <Text style={styles.routineMeta}>
+                {routine.steps.length} timer{routine.steps.length === 1 ? "" : "s"}
+              </Text>
+            </View>
             <View style={styles.routineActions}>
               <TouchableOpacity
                 accessibilityLabel={`Start ${routine.name}`}
@@ -376,9 +657,12 @@ const TimerRoutineScreen: React.FC = () => {
             </View>
           </TouchableOpacity>
         ))}
+        {filteredRoutines.length === 0 && (
+          <Text style={styles.emptyRoutineText}>No routines found</Text>
+        )}
       </ScrollView>
       <Text style={styles.helperText}>
-        click to enter . long press to select multiple and delete
+        Tap a routine to edit its timers
       </Text>
       {renderModeTabs()}
     </View>
@@ -395,17 +679,44 @@ const TimerRoutineScreen: React.FC = () => {
           <ArrowLeft size={28} color={colors.text} strokeWidth={2.8} />
         </TouchableOpacity>
         <View style={styles.headerActions}>
-          <TouchableOpacity accessibilityLabel="Edit routine" style={styles.iconButton}>
+          <TouchableOpacity
+            accessibilityLabel="Edit routine"
+            onPress={() => routineNameInputRef.current?.focus()}
+            style={styles.iconButton}
+          >
             <Edit3 size={24} color={colors.primary} />
           </TouchableOpacity>
-          <TouchableOpacity accessibilityLabel="Delete routine" style={styles.iconButton}>
+          <TouchableOpacity
+            accessibilityLabel="Delete routine"
+            onPress={deleteRoutine}
+            style={styles.iconButton}
+          >
             <Trash2 size={26} color={colors.primary} strokeWidth={2.5} />
           </TouchableOpacity>
         </View>
       </View>
-      <Text numberOfLines={1} style={styles.detailTitle}>
-        {selectedRoutine.name}
-      </Text>
+      <TextInput
+        ref={routineNameInputRef}
+        value={selectedRoutine.name}
+        onChangeText={updateRoutineName}
+        placeholder="Routine name"
+        placeholderTextColor={colors.textSecondary}
+        style={styles.detailTitle}
+      />
+      <View style={styles.detailColorRow}>
+        {routineColors.map((color) => (
+          <TouchableOpacity
+            key={color}
+            accessibilityLabel={`Set routine color ${color}`}
+            onPress={() => updateRoutineColor(color)}
+            style={[
+              styles.colorDot,
+              { backgroundColor: color },
+              selectedRoutine.color === color && styles.colorDotActive,
+            ]}
+          />
+        ))}
+      </View>
       <View style={styles.stepsPanel}>
         {selectedRoutine.steps.map((step) => (
           <View key={step.id} style={styles.stepRow}>
@@ -415,20 +726,23 @@ const TimerRoutineScreen: React.FC = () => {
               style={[styles.stepText, styles.stepNameInput]}
             />
             <TextInput
-              value={formatTime(step.seconds)}
-              onChangeText={(value) => {
-                const pieces = value.split(":").map((piece) => Number(piece) || 0);
-                const seconds =
-                  pieces.length === 3
-                    ? pieces[0] * 3600 + pieces[1] * 60 + pieces[2]
-                    : step.seconds;
-                updateStep(step.id, { seconds });
+              value={stepTimeDrafts[step.id] ?? formatTime(step.seconds)}
+              onChangeText={(value) =>
+                setStepTimeDrafts((drafts) => ({ ...drafts, [step.id]: value }))
+              }
+              onEndEditing={({ nativeEvent }) => {
+                updateStep(step.id, {
+                  seconds: parseTimerInput(nativeEvent.text, step.seconds),
+                });
+                setStepTimeDrafts((drafts) => {
+                  const nextDrafts = { ...drafts };
+                  delete nextDrafts[step.id];
+                  return nextDrafts;
+                });
               }}
+              keyboardType="numbers-and-punctuation"
               style={[styles.stepText, styles.stepTimeInput]}
             />
-            <TouchableOpacity accessibilityLabel="Edit step" style={styles.stepIcon}>
-              <Edit3 size={21} color={colors.primary} />
-            </TouchableOpacity>
             <TouchableOpacity
               accessibilityLabel="Delete step"
               onPress={() => deleteStep(step.id)}
@@ -438,6 +752,14 @@ const TimerRoutineScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
         ))}
+        <TouchableOpacity
+          accessibilityLabel="Add timer"
+          onPress={addStep}
+          style={styles.addTimerButton}
+        >
+          <Plus size={16} color={colors.primary} />
+          <Text style={styles.addTimerText}>Timer</Text>
+        </TouchableOpacity>
       </View>
       {renderControls(
         routineRunning,
@@ -526,7 +848,7 @@ const styles = StyleSheet.create({
     flex: 1,
     color: colors.primary,
     fontFamily: "serif",
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: "500",
     textAlign: "center",
   },
@@ -574,7 +896,7 @@ const styles = StyleSheet.create({
   },
   timeText: {
     color: colors.text,
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: "600",
   },
   controls: {
@@ -629,8 +951,97 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
   },
+  routineSearchBar: {
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: colors.backgroundCard,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  routineSearchInput: {
+    flex: 1,
+    minWidth: 0,
+    color: colors.text,
+    fontSize: 14,
+    paddingVertical: 0,
+  },
+  clearSearchButton: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  colorFilterRow: {
+    minHeight: 40,
+    marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  colorFilterList: {
+    alignItems: "center",
+    gap: 8,
+    paddingRight: 8,
+  },
+  clearFilterButton: {
+    height: 28,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.backgroundAlt,
+  },
+  clearFilterButtonActive: {
+    backgroundColor: colors.backgroundCard,
+  },
+  clearFilterText: {
+    color: colors.text,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  colorDot: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.shadow,
+  },
+  colorDotActive: {
+    borderWidth: 3,
+    borderColor: colors.primary,
+  },
+  addRoutineButton: {
+    alignSelf: "flex-end",
+    height: 34,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    marginTop: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    backgroundColor: colors.backgroundCard,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  addRoutineText: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: "500",
+  },
   routineList: {
-    paddingTop: 16,
+    paddingTop: 12,
     paddingHorizontal: 2,
     gap: 12,
   },
@@ -649,12 +1060,20 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   routineName: {
-    flex: 1,
     color: colors.primary,
     fontFamily: "serif",
     fontSize: 15,
     fontWeight: "500",
+  },
+  routineSummary: {
+    flex: 1,
+    minWidth: 0,
     marginRight: 10,
+  },
+  routineMeta: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    marginTop: 2,
   },
   routineActions: {
     flexDirection: "row",
@@ -681,6 +1100,16 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     textAlign: "center",
     marginBottom: 28,
+    paddingVertical: 0,
+  },
+  detailColorRow: {
+    minHeight: 36,
+    marginTop: -16,
+    marginBottom: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
   },
   stepsPanel: {
     flex: 1,
@@ -708,7 +1137,7 @@ const styles = StyleSheet.create({
     minWidth: 80,
   },
   stepTimeInput: {
-    width: 118,
+    width: 104,
     textAlign: "center",
   },
   stepIcon: {
@@ -716,6 +1145,29 @@ const styles = StyleSheet.create({
     height: 42,
     alignItems: "center",
     justifyContent: "center",
+  },
+  addTimerButton: {
+    minHeight: 42,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: colors.backgroundCard,
+  },
+  addTimerText: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  emptyRoutineText: {
+    color: colors.textSecondary,
+    fontFamily: "serif",
+    fontSize: 14,
+    textAlign: "center",
+    marginTop: 28,
   },
   upNext: {
     alignItems: "center",

@@ -1,6 +1,6 @@
 // services/DatabaseService.ts
 import * as SQLite from 'expo-sqlite';
-import { Folder, Note } from './StorageService';
+import { Folder, Note, Routine, RoutineStep } from './StorageService';
 
 interface SQLResult {
   insertId?: number;
@@ -71,6 +71,30 @@ class DatabaseService {
       `);
 
       await this.db.runAsync(`
+        CREATE TABLE IF NOT EXISTS routines (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          color TEXT NOT NULL,
+          createdAt INTEGER NOT NULL,
+          updatedAt INTEGER NOT NULL,
+          syncStatus TEXT DEFAULT 'synced'
+        )
+      `);
+
+      await this.db.runAsync(`
+        CREATE TABLE IF NOT EXISTS routine_steps (
+          id TEXT PRIMARY KEY,
+          routineId TEXT NOT NULL,
+          name TEXT NOT NULL,
+          seconds INTEGER NOT NULL,
+          position INTEGER NOT NULL,
+          createdAt INTEGER NOT NULL,
+          updatedAt INTEGER NOT NULL,
+          syncStatus TEXT DEFAULT 'synced'
+        )
+      `);
+
+      await this.db.runAsync(`
         CREATE INDEX IF NOT EXISTS idx_notes_folder 
         ON notes(folderId)
       `);
@@ -78,6 +102,11 @@ class DatabaseService {
       await this.db.runAsync(`
         CREATE INDEX IF NOT EXISTS idx_folders_parent 
         ON folders(parentId)
+      `);
+
+      await this.db.runAsync(`
+        CREATE INDEX IF NOT EXISTS idx_routine_steps_routine 
+        ON routine_steps(routineId)
       `);
 
     } catch (error) {
@@ -203,6 +232,96 @@ class DatabaseService {
     }
   }
 
+  async saveRoutine(routine: Routine): Promise<void> {
+    if (!this.db) return;
+
+    try {
+      await this.db.runAsync(
+        `INSERT OR REPLACE INTO routines (id, name, color, createdAt, updatedAt, syncStatus)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [
+          routine.id,
+          routine.name,
+          routine.color,
+          routine.createdAt,
+          routine.updatedAt,
+          routine.syncStatus,
+        ],
+      );
+
+      await this.db.runAsync('DELETE FROM routine_steps WHERE routineId = ?', [
+        routine.id,
+      ]);
+
+      for (const step of routine.steps) {
+        await this.db.runAsync(
+          `INSERT OR REPLACE INTO routine_steps
+           (id, routineId, name, seconds, position, createdAt, updatedAt, syncStatus)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            step.id,
+            routine.id,
+            step.name,
+            step.seconds,
+            step.position,
+            step.createdAt,
+            step.updatedAt,
+            step.syncStatus,
+          ],
+        );
+      }
+
+      if (routine.syncStatus !== 'synced') {
+        await this.addToPendingSync('routines', routine.id, 'INSERT', routine);
+      }
+    } catch (error) {
+      console.error('Error saving routine to database:', error);
+      throw error;
+    }
+  }
+
+  async getRoutines(): Promise<Routine[]> {
+    if (!this.db) return [];
+
+    try {
+      const routines = await this.db.getAllAsync<Omit<Routine, 'steps'>>(
+        'SELECT * FROM routines ORDER BY updatedAt DESC',
+      );
+      const steps = await this.db.getAllAsync<RoutineStep>(
+        'SELECT * FROM routine_steps ORDER BY position ASC',
+      );
+      const stepsByRoutine = new Map<string, RoutineStep[]>();
+
+      steps.forEach((step) => {
+        const existing = stepsByRoutine.get(step.routineId) ?? [];
+        existing.push(step);
+        stepsByRoutine.set(step.routineId, existing);
+      });
+
+      return routines.map((routine) => ({
+        ...routine,
+        steps: stepsByRoutine.get(routine.id) ?? [],
+      }));
+    } catch (error) {
+      console.error('Error getting routines from database:', error);
+      return [];
+    }
+  }
+
+  async deleteRoutine(id: string): Promise<void> {
+    if (!this.db) return;
+
+    try {
+      await this.db.runAsync('DELETE FROM routine_steps WHERE routineId = ?', [id]);
+      await this.db.runAsync('DELETE FROM routines WHERE id = ?', [id]);
+
+      await this.addToPendingSync('routines', id, 'DELETE', null);
+    } catch (error) {
+      console.error('Error deleting routine from database:', error);
+      throw error;
+    }
+  }
+
   // Pending sync operations
   private async addToPendingSync(
     tableName: string, 
@@ -260,10 +379,12 @@ class DatabaseService {
     try {
       const folders = await this.getFolders();
       const notes = await this.getNotes();
+      const routines = await this.getRoutines();
       
       const backup = {
         folders,
         notes,
+        routines,
         timestamp: Date.now(),
         version: '1.0',
       };
@@ -288,6 +409,8 @@ class DatabaseService {
         // Clear existing data
         await this.db.execAsync('DELETE FROM folders');
         await this.db.execAsync('DELETE FROM notes');
+        await this.db.execAsync('DELETE FROM routine_steps');
+        await this.db.execAsync('DELETE FROM routines');
         await this.db.execAsync('DELETE FROM pending_sync');
         
         // Import folders
@@ -298,6 +421,12 @@ class DatabaseService {
         // Import notes
         for (const note of data.notes) {
           await this.saveNote(note);
+        }
+
+        if (Array.isArray(data.routines)) {
+          for (const routine of data.routines) {
+            await this.saveRoutine(routine);
+          }
         }
         
         // Commit transaction

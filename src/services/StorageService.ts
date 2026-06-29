@@ -22,6 +22,27 @@ export interface Note {
   type?: "text" | "whiteboard";
 }
 
+export interface RoutineStep {
+  id: string;
+  routineId: string;
+  name: string;
+  seconds: number;
+  position: number;
+  createdAt: number;
+  updatedAt: number;
+  syncStatus: "pending" | "synced";
+}
+
+export interface Routine {
+  id: string;
+  name: string;
+  color: string;
+  createdAt: number;
+  updatedAt: number;
+  syncStatus: "pending" | "synced";
+  steps: RoutineStep[];
+}
+
 class StorageService {
   private initialized = false;
   private initializationPromise: Promise<void> | null = null;
@@ -83,6 +104,16 @@ class StorageService {
     }
   }
 
+  async getRoutines(): Promise<Routine[]> {
+    try {
+      await this.initialize();
+      return await DatabaseService.getRoutines();
+    } catch (error) {
+      console.error("Error getting routines:", error);
+      return [];
+    }
+  }
+
   async saveFolder(folder: Folder): Promise<void> {
     try {
       await this.initialize();
@@ -103,6 +134,16 @@ class StorageService {
     }
   }
 
+  async saveRoutine(routine: Routine): Promise<void> {
+    try {
+      await this.initialize();
+      await DatabaseService.saveRoutine(routine);
+    } catch (error) {
+      console.error("Error saving routine:", error);
+      throw error;
+    }
+  }
+
   async deleteFolder(id: string): Promise<void> {
     try {
       await this.initialize();
@@ -119,6 +160,16 @@ class StorageService {
       await DatabaseService.deleteNote(id);
     } catch (error) {
       console.error("Error deleting note:", error);
+      throw error;
+    }
+  }
+
+  async deleteRoutine(id: string): Promise<void> {
+    try {
+      await this.initialize();
+      await DatabaseService.deleteRoutine(id);
+    } catch (error) {
+      console.error("Error deleting routine:", error);
       throw error;
     }
   }
