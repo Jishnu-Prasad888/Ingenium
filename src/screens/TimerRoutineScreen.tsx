@@ -1058,6 +1058,16 @@ const TimerRoutineScreen: React.FC = () => {
         <Text numberOfLines={1} style={styles.currentStep}>
           {activeStep?.name ?? "Done"}
         </Text>
+        {activeStep && (
+          <TouchableOpacity
+            accessibilityLabel="Skip current timer"
+            onPress={skipStep}
+            style={styles.skipTimerButton}
+          >
+            <SkipForward size={15} color={colors.primary} />
+            <Text style={styles.skipTimerText}>Skip Timer</Text>
+          </TouchableOpacity>
+        )}
         <View style={styles.upNextLine}>
           <View style={styles.line} />
           <Text style={styles.upNextLabel}>Up Next</Text>
@@ -1574,6 +1584,21 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600",
     paddingHorizontal: 12,
+  },
+  skipTimerButton: {
+    height: 34,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: colors.backgroundCard,
+  },
+  skipTimerText: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: "600",
   },
   nextStep: {
     width: 230,
