@@ -869,7 +869,10 @@ const TimerRoutineScreen: React.FC = () => {
           <Text style={styles.upNextLabel}>Up Next</Text>
           <View style={styles.line} />
         </View>
-        <Text numberOfLines={1} style={styles.nextStep}>
+        <Text
+          numberOfLines={1}
+          style={[styles.nextStep, !upcomingStep && styles.completeNextStep]}
+        >
           {upcomingStep?.name ?? "Complete"}
         </Text>
       </View>
@@ -1266,6 +1269,10 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "600",
     paddingHorizontal: 12,
+  },
+  completeNextStep: {
+    backgroundColor: "#BBF7D0",
+    color: "#166534",
   },
   upNextLine: {
     width: 248,
