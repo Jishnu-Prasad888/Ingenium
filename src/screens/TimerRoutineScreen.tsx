@@ -800,7 +800,7 @@ const TimerRoutineScreen: React.FC = () => {
   );
 
   const renderRoutineDetail = () => (
-    <View style={styles.screenBody}>
+    <View style={[styles.screenBody, styles.routineDetailBody]}>
       <View style={styles.detailTopBar}>
         <TouchableOpacity
           accessibilityLabel="Back to routines"
@@ -856,63 +856,72 @@ const TimerRoutineScreen: React.FC = () => {
         ))}
       </View>
       <View style={styles.stepsPanel}>
-        {selectedRoutine.steps.map((step) => (
-          <View key={step.id} style={styles.stepRow}>
-            <TextInput
-              value={step.name}
-              onChangeText={(name) => updateStep(step.id, { name })}
-              editable={isEditingRoutine}
-              style={[
-                styles.stepText,
-                styles.stepNameInput,
-                !isEditingRoutine && styles.lockedText,
-              ]}
-            />
-            <TextInput
-              value={stepTimeDrafts[step.id] ?? formatTime(step.seconds)}
-              onChangeText={(value) =>
-                setStepTimeDrafts((drafts) => ({ ...drafts, [step.id]: value }))
-              }
-              onEndEditing={({ nativeEvent }) => {
-                updateStep(step.id, {
-                  seconds: parseTimerInput(nativeEvent.text, step.seconds),
-                });
-                setStepTimeDrafts((drafts) => {
-                  const nextDrafts = { ...drafts };
-                  delete nextDrafts[step.id];
-                  return nextDrafts;
-                });
-              }}
-              editable={isEditingRoutine}
-              keyboardType="numbers-and-punctuation"
-              style={[
-                styles.stepText,
-                styles.stepTimeInput,
-                !isEditingRoutine && styles.lockedText,
-              ]}
-            />
-            {isEditingRoutine && (
-              <TouchableOpacity
-                accessibilityLabel="Delete step"
-                onPress={() => deleteStep(step.id)}
-                style={styles.stepIcon}
-              >
-                <Trash2 size={24} color={colors.primary} strokeWidth={2.4} />
-              </TouchableOpacity>
-            )}
-          </View>
-        ))}
-        {isEditingRoutine && (
-          <TouchableOpacity
-            accessibilityLabel="Add timer"
-            onPress={addStep}
-            style={styles.addTimerButton}
-          >
-            <Plus size={16} color={colors.primary} />
-            <Text style={styles.addTimerText}>Timer</Text>
-          </TouchableOpacity>
-        )}
+        <ScrollView
+          style={styles.stepsScroll}
+          contentContainerStyle={styles.stepsScrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {selectedRoutine.steps.map((step) => (
+            <View key={step.id} style={styles.stepRow}>
+              <TextInput
+                value={step.name}
+                onChangeText={(name) => updateStep(step.id, { name })}
+                editable={isEditingRoutine}
+                style={[
+                  styles.stepText,
+                  styles.stepNameInput,
+                  !isEditingRoutine && styles.lockedText,
+                ]}
+              />
+              <TextInput
+                value={stepTimeDrafts[step.id] ?? formatTime(step.seconds)}
+                onChangeText={(value) =>
+                  setStepTimeDrafts((drafts) => ({
+                    ...drafts,
+                    [step.id]: value,
+                  }))
+                }
+                onEndEditing={({ nativeEvent }) => {
+                  updateStep(step.id, {
+                    seconds: parseTimerInput(nativeEvent.text, step.seconds),
+                  });
+                  setStepTimeDrafts((drafts) => {
+                    const nextDrafts = { ...drafts };
+                    delete nextDrafts[step.id];
+                    return nextDrafts;
+                  });
+                }}
+                editable={isEditingRoutine}
+                keyboardType="numbers-and-punctuation"
+                style={[
+                  styles.stepText,
+                  styles.stepTimeInput,
+                  !isEditingRoutine && styles.lockedText,
+                ]}
+              />
+              {isEditingRoutine && (
+                <TouchableOpacity
+                  accessibilityLabel="Delete step"
+                  onPress={() => deleteStep(step.id)}
+                  style={styles.stepIcon}
+                >
+                  <Trash2 size={24} color={colors.primary} strokeWidth={2.4} />
+                </TouchableOpacity>
+              )}
+            </View>
+          ))}
+        </ScrollView>
       </View>
+      {isEditingRoutine && (
+        <TouchableOpacity
+          accessibilityLabel="Add timer"
+          onPress={addStep}
+          style={styles.addTimerButton}
+        >
+          <Plus size={16} color={colors.primary} />
+          <Text style={styles.addTimerText}>Timer</Text>
+        </TouchableOpacity>
+      )}
       {renderControls(
         routineRunning,
         () => {
@@ -1073,6 +1082,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 18,
     paddingBottom: 158,
+  },
+  routineDetailBody: {
+    paddingBottom: 78,
   },
   topBar: {
     minHeight: 58,
@@ -1337,13 +1349,13 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "500",
     textAlign: "center",
-    marginBottom: 28,
+    marginBottom: 20,
     paddingVertical: 0,
   },
   detailColorRow: {
     minHeight: 36,
-    marginTop: -16,
-    marginBottom: 14,
+    marginTop: -10,
+    marginBottom: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -1351,10 +1363,18 @@ const styles = StyleSheet.create({
   },
   stepsPanel: {
     flex: 1,
+    minHeight: 0,
     borderRadius: 14,
     backgroundColor: colors.backgroundAlt,
-    padding: 10,
+    padding: 8,
+    marginBottom: 12,
+  },
+  stepsScroll: {
+    flex: 1,
+  },
+  stepsScrollContent: {
     gap: 14,
+    paddingBottom: 2,
   },
   stepRow: {
     minHeight: 58,
@@ -1388,7 +1408,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   addTimerButton: {
-    minHeight: 42,
+    height: 44,
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.primary,
@@ -1396,6 +1416,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
+    marginBottom: 12,
     backgroundColor: colors.backgroundCard,
   },
   addTimerText: {
