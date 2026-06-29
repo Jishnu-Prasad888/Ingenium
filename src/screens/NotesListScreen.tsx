@@ -1,5 +1,5 @@
 // screens/NotesListScreen.tsx
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
 import {
   View,
   ScrollView,
@@ -7,6 +7,7 @@ import {
   Text,
   Animated,
   Dimensions,
+  Easing,
   Pressable,
   StyleSheet,
 } from "react-native";
@@ -34,28 +35,51 @@ const NotesListScreen: React.FC = () => {
     setCurrentScreen,
   } = useApp();
   const scrollRef = useRef<ScrollView>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerVisible, setDrawerVisible] = useState(false);
   const drawerProgress = useRef(new Animated.Value(0)).current;
   const allNotes = getFilteredAndSortedItems(notes, "note");
-  const drawerWidth = Math.max(190, Dimensions.get("window").width * 0.5);
+  const drawerWidth = Math.max(260, Dimensions.get("window").width * 0.72);
   const drawerTranslateX = drawerProgress.interpolate({
     inputRange: [0, 1],
     outputRange: [-drawerWidth, 0],
   });
 
-  useEffect(() => {
+  const openDrawer = () => {
+    drawerProgress.stopAnimation();
+    drawerProgress.setValue(0);
+    setDrawerVisible(true);
+
+    requestAnimationFrame(() => {
+      Animated.timing(drawerProgress, {
+        toValue: 1,
+        duration: 260,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    });
+  };
+
+  const closeDrawer = (onClosed?: () => void) => {
+    drawerProgress.stopAnimation();
     Animated.timing(drawerProgress, {
-      toValue: drawerOpen ? 1 : 0,
-      duration: 220,
+      toValue: 0,
+      duration: 200,
+      easing: Easing.in(Easing.cubic),
       useNativeDriver: true,
-    }).start();
-  }, [drawerOpen, drawerProgress]);
+    }).start(({ finished }) => {
+      if (finished) {
+        setDrawerVisible(false);
+        onClosed?.();
+      }
+    });
+  };
 
   const openTimerScreen = () => {
-    setDrawerOpen(false);
-    setCurrentFolderId(null);
-    setCurrentNoteId(null);
-    setCurrentScreen("timer-routine");
+    closeDrawer(() => {
+      setCurrentFolderId(null);
+      setCurrentNoteId(null);
+      setCurrentScreen("timer-routine");
+    });
   };
 
   return (
@@ -63,7 +87,7 @@ const NotesListScreen: React.FC = () => {
       <Header />
       <TouchableOpacity
         accessibilityLabel="Open menu"
-        onPress={() => setDrawerOpen(true)}
+        onPress={openDrawer}
         style={styles.menuButton}
       >
         <Menu size={34} color="#FF7A7D" strokeWidth={3} />
@@ -102,13 +126,20 @@ const NotesListScreen: React.FC = () => {
 
       <ScrollToTopButton scrollRef={scrollRef} />
 
-      {drawerOpen && (
+      {drawerVisible && (
         <View style={[StyleSheet.absoluteFill, styles.drawerLayer]}>
-          <Pressable
-            accessibilityLabel="Close menu"
-            onPress={() => setDrawerOpen(false)}
-            style={[styles.drawerScrim, { left: drawerWidth }]}
-          />
+          <Animated.View
+            style={[
+              styles.drawerScrim,
+              { left: drawerWidth, opacity: drawerProgress },
+            ]}
+          >
+            <Pressable
+              accessibilityLabel="Close menu"
+              onPress={() => closeDrawer()}
+              style={StyleSheet.absoluteFill}
+            />
+          </Animated.View>
           <Animated.View
             style={[
               styles.drawer,
@@ -118,12 +149,13 @@ const NotesListScreen: React.FC = () => {
               },
             ]}
           >
+            <View style={styles.drawerAccent} />
             <TouchableOpacity
               accessibilityLabel="Close menu"
-              onPress={() => setDrawerOpen(false)}
+              onPress={() => closeDrawer()}
               style={styles.drawerCloseButton}
             >
-              <X size={34} color="#FF7A7D" strokeWidth={2.6} />
+              <X size={21} color={colors.primary} strokeWidth={2.6} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -131,7 +163,9 @@ const NotesListScreen: React.FC = () => {
               onPress={openTimerScreen}
               style={styles.drawerItem}
             >
-              <Clock3 size={24} color={colors.text} />
+              <View style={styles.drawerIconShell}>
+                <Clock3 size={19} color={colors.primary} />
+              </View>
               <Text style={styles.drawerItemText}>Timer</Text>
             </TouchableOpacity>
           </Animated.View>
@@ -173,7 +207,7 @@ const styles = StyleSheet.create({
     top: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.05)",
+    backgroundColor: "rgba(44,24,16,0.18)",
   },
   drawerLayer: {
     zIndex: 100,
@@ -184,36 +218,62 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
     bottom: 0,
-    borderRightWidth: 2,
-    borderColor: colors.text,
-    backgroundColor: colors.white,
+    borderTopRightRadius: 24,
+    borderBottomRightRadius: 24,
+    backgroundColor: colors.background,
     paddingTop: 54,
-    paddingHorizontal: 14,
+    paddingHorizontal: 18,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 6, height: 0 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
     zIndex: 101,
     elevation: 101,
   },
   drawerCloseButton: {
     alignSelf: "flex-end",
-    width: 48,
-    height: 48,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: colors.backgroundAlt,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 30,
+    marginBottom: 34,
+  },
+  drawerAccent: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 7,
+    backgroundColor: colors.primary,
+    borderTopRightRadius: 24,
   },
   drawerItem: {
-    minHeight: 50,
-    borderWidth: 2,
-    borderColor: colors.text,
-    borderRadius: 8,
-    backgroundColor: "#FFD4D4",
-    paddingHorizontal: 14,
+    minHeight: 52,
+    borderRadius: 14,
+    backgroundColor: colors.backgroundCard,
+    paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 11,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.28,
+    shadowRadius: 7,
+    elevation: 5,
+  },
+  drawerIconShell: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    backgroundColor: colors.backgroundFolder,
+    alignItems: "center",
+    justifyContent: "center",
   },
   drawerItemText: {
     color: colors.text,
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: "700",
   },
 });
