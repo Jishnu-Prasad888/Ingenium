@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  Animated,
+  Easing,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
   ArrowLeft,
+  CheckCircle2,
   Edit3,
   Pause,
   Play,
@@ -38,6 +41,15 @@ const routineColors = [
   "#BFDBFE",
   "#FBCFE8",
 ];
+
+const confettiPieces = Array.from({ length: 18 }, (_, index) => ({
+  id: index,
+  left: `${8 + ((index * 17) % 84)}%` as `${number}%`,
+  color: routineColors[index % routineColors.length],
+  drift: index % 2 === 0 ? -28 : 28,
+  fall: 150 + (index % 5) * 18,
+  rotate: `${90 + index * 23}deg`,
+}));
 
 const seedTimestamp = 1700000000000;
 
@@ -143,6 +155,9 @@ const parseTimerInput = (value: string, fallbackSeconds: number) => {
 const TimerRoutineScreen: React.FC = () => {
   const { setCurrentScreen } = useApp();
   const routineNameInputRef = useRef<TextInput>(null);
+  const lastTouchAtRef = useRef(Date.now());
+  const celebrationPulse = useRef(new Animated.Value(0)).current;
+  const confettiProgress = useRef(new Animated.Value(0)).current;
   const [mode, setMode] = useState<Mode>("timer");
   const [routineView, setRoutineView] = useState<RoutineView>("list");
   const [routines, setRoutines] = useState<Routine[]>(routineSeed);
@@ -160,6 +175,11 @@ const TimerRoutineScreen: React.FC = () => {
     routineSeed[0].steps[0].seconds,
   );
   const [routineRunning, setRoutineRunning] = useState(false);
+  const [completionPending, setCompletionPending] = useState(false);
+  const [routineCompleteVisible, setRoutineCompleteVisible] = useState(false);
+  const [completedRoutineName, setCompletedRoutineName] = useState(
+    routineSeed[0].name,
+  );
 
   const selectedRoutine = useMemo(
     () =>
@@ -246,6 +266,9 @@ const TimerRoutineScreen: React.FC = () => {
         }
 
         setRoutineRunning(false);
+        setCompletedRoutineName(selectedRoutine.name || "Routine");
+        setCompletionPending(true);
+        lastTouchAtRef.current = Date.now();
         return 0;
       });
     }, 1000);
@@ -253,8 +276,63 @@ const TimerRoutineScreen: React.FC = () => {
     return () => clearInterval(interval);
   }, [activeStepIndex, routineRunning, selectedRoutine.steps]);
 
+  useEffect(() => {
+    if (!completionPending || routineCompleteVisible) return;
+
+    const interval = setInterval(() => {
+      if (Date.now() - lastTouchAtRef.current >= 3000) {
+        setCompletionPending(false);
+        setRoutineCompleteVisible(true);
+      }
+    }, 250);
+
+    return () => clearInterval(interval);
+  }, [completionPending, routineCompleteVisible]);
+
+  useEffect(() => {
+    if (!routineCompleteVisible) return;
+
+    celebrationPulse.setValue(0);
+    confettiProgress.setValue(0);
+
+    const pulseAnimation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(celebrationPulse, {
+          toValue: 1,
+          duration: 780,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(celebrationPulse, {
+          toValue: 0,
+          duration: 780,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    const confettiAnimation = Animated.loop(
+      Animated.timing(confettiProgress, {
+        toValue: 1,
+        duration: 1900,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    );
+
+    pulseAnimation.start();
+    confettiAnimation.start();
+
+    return () => {
+      pulseAnimation.stop();
+      confettiAnimation.stop();
+    };
+  }, [celebrationPulse, confettiProgress, routineCompleteVisible]);
+
   const showMode = (nextMode: Mode) => {
     setMode(nextMode);
+    setCompletionPending(false);
+    setRoutineCompleteVisible(false);
     if (nextMode === "routine") {
       setRoutineView("list");
     }
@@ -296,6 +374,8 @@ const TimerRoutineScreen: React.FC = () => {
     setRoutineRunning(false);
     setIsEditingRoutine(false);
     setStepTimeDrafts({});
+    setCompletionPending(false);
+    setRoutineCompleteVisible(false);
     setRoutineView("detail");
   };
 
@@ -304,6 +384,8 @@ const TimerRoutineScreen: React.FC = () => {
     setActiveStepIndex(0);
     setActiveSecondsLeft(routine.steps[0]?.seconds ?? 0);
     setRoutineRunning(true);
+    setCompletionPending(false);
+    setRoutineCompleteVisible(false);
     setRoutineView("active");
   };
 
@@ -311,6 +393,8 @@ const TimerRoutineScreen: React.FC = () => {
     setRoutineRunning(false);
     setActiveStepIndex(0);
     setActiveSecondsLeft(selectedRoutine.steps[0]?.seconds ?? 0);
+    setCompletionPending(false);
+    setRoutineCompleteVisible(false);
   };
 
   const skipStep = () => {
@@ -321,6 +405,9 @@ const TimerRoutineScreen: React.FC = () => {
     } else {
       setRoutineRunning(false);
       setActiveSecondsLeft(0);
+      setCompletedRoutineName(selectedRoutine.name || "Routine");
+      setCompletionPending(true);
+      lastTouchAtRef.current = Date.now();
     }
   };
 
@@ -879,6 +966,82 @@ const TimerRoutineScreen: React.FC = () => {
     </View>
   );
 
+  const renderRoutineComplete = () => (
+    <View style={styles.completeScreen}>
+      <View pointerEvents="none" style={styles.confettiLayer}>
+        {confettiPieces.map((piece) => (
+          <Animated.View
+            key={piece.id}
+            style={[
+              styles.confettiPiece,
+              {
+                left: piece.left,
+                backgroundColor: piece.color,
+                opacity: confettiProgress.interpolate({
+                  inputRange: [0, 0.12, 0.82, 1],
+                  outputRange: [0, 1, 1, 0],
+                }),
+                transform: [
+                  {
+                    translateX: confettiProgress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, piece.drift],
+                    }),
+                  },
+                  {
+                    translateY: confettiProgress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-28, piece.fall],
+                    }),
+                  },
+                  {
+                    rotate: confettiProgress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ["0deg", piece.rotate],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
+        ))}
+      </View>
+
+      <Animated.View
+        style={[
+          styles.completeBadge,
+          {
+            transform: [
+              {
+                scale: celebrationPulse.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [1, 1.08],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
+        <CheckCircle2 size={64} color="#166534" strokeWidth={2.4} />
+      </Animated.View>
+      <Text style={styles.completeTitle}>Routine Complete</Text>
+      <Text numberOfLines={2} style={styles.completeRoutineName}>
+        {completedRoutineName}
+      </Text>
+      <TouchableOpacity
+        accessibilityLabel="Back to routines"
+        onPress={() => {
+          setRoutineCompleteVisible(false);
+          setCompletionPending(false);
+          setRoutineView("list");
+        }}
+        style={styles.completeButton}
+      >
+        <Text style={styles.completeButtonText}>Done</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   const renderRoutine = () => {
     if (routineView === "detail") return renderRoutineDetail();
     if (routineView === "active") return renderActiveRoutine();
@@ -886,10 +1049,16 @@ const TimerRoutineScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      {mode === "timer" && renderTimer()}
-      {mode === "routine" && renderRoutine()}
-      {mode === "stopwatch" && renderStopwatch()}
+    <SafeAreaView
+      onTouchStart={() => {
+        lastTouchAtRef.current = Date.now();
+      }}
+      style={styles.safeArea}
+    >
+      {routineCompleteVisible && renderRoutineComplete()}
+      {!routineCompleteVisible && mode === "timer" && renderTimer()}
+      {!routineCompleteVisible && mode === "routine" && renderRoutine()}
+      {!routineCompleteVisible && mode === "stopwatch" && renderStopwatch()}
     </SafeAreaView>
   );
 };
@@ -1273,6 +1442,67 @@ const styles = StyleSheet.create({
   completeNextStep: {
     backgroundColor: "#BBF7D0",
     color: "#166534",
+  },
+  completeScreen: {
+    flex: 1,
+    overflow: "hidden",
+    backgroundColor: "#22C55E",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+  },
+  confettiLayer: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  confettiPiece: {
+    position: "absolute",
+    top: 40,
+    width: 10,
+    height: 18,
+    borderRadius: 3,
+  },
+  completeBadge: {
+    width: 116,
+    height: 116,
+    borderRadius: 58,
+    backgroundColor: "#DCFCE7",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#166534",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.24,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  completeTitle: {
+    color: colors.white,
+    fontFamily: "serif",
+    fontSize: 28,
+    fontWeight: "700",
+    textAlign: "center",
+    marginTop: 24,
+  },
+  completeRoutineName: {
+    color: "#ECFDF5",
+    fontSize: 16,
+    fontWeight: "600",
+    textAlign: "center",
+    marginTop: 8,
+  },
+  completeButton: {
+    minWidth: 116,
+    height: 42,
+    borderRadius: 12,
+    backgroundColor: colors.white,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 30,
+    paddingHorizontal: 18,
+  },
+  completeButtonText: {
+    color: "#166534",
+    fontSize: 14,
+    fontWeight: "700",
   },
   upNextLine: {
     width: 248,
