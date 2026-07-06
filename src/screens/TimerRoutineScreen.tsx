@@ -194,6 +194,8 @@ const TimerRoutineScreen: React.FC = () => {
   const lastTouchAtRef = useRef(Date.now());
   const celebrationPulse = useRef(new Animated.Value(0)).current;
   const confettiProgress = useRef(new Animated.Value(0)).current;
+  const clockRotation = useRef(new Animated.Value(0)).current;
+  const [clockLandscape, setClockLandscape] = useState(false);
   const sakuraPetals = useMemo<SakuraPetalConfig[]>(
     () =>
       Array.from({ length: 13 }, (_, index) => ({
@@ -888,24 +890,81 @@ const TimerRoutineScreen: React.FC = () => {
     </View>
   );
 
+  const rotationStyle = {
+    transform: [
+      {
+        rotate: clockRotation.interpolate({
+          inputRange: [0, 1],
+          outputRange: ["0deg", "90deg"],
+        }),
+      },
+      {
+        scale: clockRotation.interpolate({
+          inputRange: [0, 0.6, 1],
+          outputRange: [1, 1.05, 1.02],
+        }),
+      },
+    ],
+  } as const;
+
+  const toggleClockOrientation = () => {
+    const next = !clockLandscape;
+    setClockLandscape(next);
+    Animated.spring(clockRotation, {
+      toValue: next ? 1 : 0,
+      stiffness: 240,
+      damping: 18,
+      mass: 0.8,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const renderRotateButton = () => (
+    <TouchableOpacity
+      accessibilityLabel="Rotate timer"
+      onPress={toggleClockOrientation}
+      style={styles.rotateButton}
+    >
+      <RotateCcw size={18} color={colors.text} />
+    </TouchableOpacity>
+  );
+
   const renderTimer = () => (
     <View style={[styles.screenBody, styles.clockScene]}>
       {(timerRunning || stopwatchRunning) && renderSakuraOverlay()}
       <View style={styles.clockContent}>
         {renderAppTopBar("Timer")}
-        <View style={styles.clockWrap}>
-          <View style={styles.timeCircle}>
-            <Text style={styles.timeText}>{formatTime(timerSeconds)}</Text>
+        <View style={styles.clockMain}>
+          <View style={[styles.clockLayout, clockLandscape && styles.clockLayoutLandscape]}>
+            <Animated.View
+              style={[
+                styles.rotatingBlock,
+                clockLandscape && styles.landscapeBlock,
+                clockLandscape && styles.rotatingBlockLandscape,
+                rotationStyle,
+              ]}
+            >
+              <View style={[styles.clockWrap, clockLandscape && styles.clockWrapLandscape]}>
+                <View style={styles.timeCircle}>
+                  <Text style={styles.timeText}>{formatTime(timerSeconds)}</Text>
+                </View>
+              </View>
+            </Animated.View>
+            <View
+              style={[styles.controlsContainer, clockLandscape && styles.controlsInline]}
+            >
+              {renderControls(
+                timerRunning,
+                () => setTimerRunning((running) => !running),
+                () => {
+                  setTimerRunning(false);
+                  setTimerSeconds(5 * 60);
+                },
+              )}
+            </View>
           </View>
+          <View style={styles.rotateButtonRow}>{renderRotateButton()}</View>
         </View>
-        {renderControls(
-          timerRunning,
-          () => setTimerRunning((running) => !running),
-          () => {
-            setTimerRunning(false);
-            setTimerSeconds(5 * 60);
-          },
-        )}
       </View>
       {renderModeTabs()}
     </View>
@@ -916,19 +975,37 @@ const TimerRoutineScreen: React.FC = () => {
       {(timerRunning || stopwatchRunning) && renderSakuraOverlay()}
       <View style={styles.clockContent}>
         {renderAppTopBar("Stopwatch")}
-        <View style={styles.clockWrap}>
-          <View style={styles.timeCircle}>
-            <Text style={styles.timeText}>{formatTime(stopwatchSeconds)}</Text>
+        <View style={styles.clockMain}>
+          <View style={[styles.clockLayout, clockLandscape && styles.clockLayoutLandscape]}>
+            <Animated.View
+              style={[
+                styles.rotatingBlock,
+                clockLandscape && styles.landscapeBlock,
+                clockLandscape && styles.rotatingBlockLandscape,
+                rotationStyle,
+              ]}
+            >
+              <View style={[styles.clockWrap, clockLandscape && styles.clockWrapLandscape]}>
+                <View style={styles.timeCircle}>
+                  <Text style={styles.timeText}>{formatTime(stopwatchSeconds)}</Text>
+                </View>
+              </View>
+            </Animated.View>
+            <View
+              style={[styles.controlsContainer, clockLandscape && styles.controlsInline]}
+            >
+              {renderControls(
+                stopwatchRunning,
+                () => setStopwatchRunning((running) => !running),
+                () => {
+                  setStopwatchRunning(false);
+                  setStopwatchSeconds(0);
+                },
+              )}
+            </View>
           </View>
+          <View style={styles.rotateButtonRow}>{renderRotateButton()}</View>
         </View>
-        {renderControls(
-          stopwatchRunning,
-          () => setStopwatchRunning((running) => !running),
-          () => {
-            setStopwatchRunning(false);
-            setStopwatchSeconds(0);
-          },
-        )}
       </View>
       {renderModeTabs()}
     </View>
@@ -1195,14 +1272,16 @@ const TimerRoutineScreen: React.FC = () => {
           <Text style={styles.addTimerText}>Timer</Text>
         </TouchableOpacity>
       )}
-      {renderControls(
-        routineRunning,
-        () => {
-          setRoutineRunning((running) => !running);
-        },
-        resetRoutine,
-        skipStep,
-      )}
+      <View style={styles.controlsContainer}>
+        {renderControls(
+          routineRunning,
+          () => {
+            setRoutineRunning((running) => !running);
+          },
+          resetRoutine,
+          skipStep,
+        )}
+      </View>
     </View>
   );
 
@@ -1219,42 +1298,62 @@ const TimerRoutineScreen: React.FC = () => {
             <ArrowLeft size={28} color={colors.text} strokeWidth={2.8} />
           </TouchableOpacity>
         </View>
-        <View style={[styles.clockWrap, styles.activeClockWrap]}>
-          <View style={styles.timeCircle}>
-            <Text style={styles.timeText}>{formatTime(activeSecondsLeft)}</Text>
-          </View>
-        </View>
-        {renderControls(
-          routineRunning,
-          () => setRoutineRunning((running) => !running),
-          resetRoutine,
-          skipStep,
-        )}
-        <View style={styles.upNext}>
-          <Text numberOfLines={1} style={styles.currentStep}>
-            {activeStep?.name ?? "Done"}
-          </Text>
-          {activeStep && (
-            <TouchableOpacity
-              accessibilityLabel="Skip current timer"
-              onPress={skipStep}
-              style={styles.skipTimerButton}
+        <View style={styles.clockMain}>
+          <View style={[styles.clockLayout, clockLandscape && styles.clockLayoutLandscape]}>
+            <Animated.View
+              style={[
+                styles.rotatingBlock,
+                clockLandscape && styles.landscapeBlock,
+                clockLandscape && styles.rotatingBlockLandscape,
+                rotationStyle,
+              ]}
             >
-              <SkipForward size={15} color={colors.primary} />
-              <Text style={styles.skipTimerText}>Skip Timer</Text>
-            </TouchableOpacity>
-          )}
-          <View style={styles.upNextLine}>
-            <View style={styles.line} />
-            <Text style={styles.upNextLabel}>Up Next</Text>
-            <View style={styles.line} />
+              <View
+                style={[styles.clockWrap, styles.activeClockWrap, clockLandscape && styles.clockWrapLandscape]}
+              >
+                <View style={styles.timeCircle}>
+                  <Text style={styles.timeText}>{formatTime(activeSecondsLeft)}</Text>
+                </View>
+              </View>
+            </Animated.View>
+            <View
+              style={[styles.controlsContainer, clockLandscape && styles.controlsInline]}
+            >
+              {renderControls(
+                routineRunning,
+                () => setRoutineRunning((running) => !running),
+                resetRoutine,
+                skipStep,
+              )}
+            </View>
           </View>
-          <Text
-            numberOfLines={1}
-            style={[styles.nextStep, !upcomingStep && styles.completeNextStep]}
-          >
-            {upcomingStep?.name ?? "Complete"}
-          </Text>
+          <View style={styles.rotateButtonRow}>{renderRotateButton()}</View>
+          <View style={styles.upNext}>
+            <Text numberOfLines={1} style={styles.currentStep}>
+              {activeStep?.name ?? "Done"}
+            </Text>
+            {activeStep && (
+              <TouchableOpacity
+                accessibilityLabel="Skip current timer"
+                onPress={skipStep}
+                style={styles.skipTimerButton}
+              >
+                <SkipForward size={15} color={colors.primary} />
+                <Text style={styles.skipTimerText}>Skip Timer</Text>
+              </TouchableOpacity>
+            )}
+            <View style={styles.upNextLine}>
+              <View style={styles.line} />
+              <Text style={styles.upNextLabel}>Up Next</Text>
+              <View style={styles.line} />
+            </View>
+            <Text
+              numberOfLines={1}
+              style={[styles.nextStep, !upcomingStep && styles.completeNextStep]}
+            >
+              {upcomingStep?.name ?? "Complete"}
+            </Text>
+          </View>
         </View>
       </View>
     </View>
@@ -1395,7 +1494,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     paddingTop: 18,
-    paddingBottom: 158,
+    paddingBottom: 80,
     position: "relative",
   },
   clockScene: {
@@ -1404,6 +1503,61 @@ const styles = StyleSheet.create({
   },
   clockContent: {
     zIndex: 2,
+    flex: 1,
+    justifyContent: "flex-start",
+    paddingTop: 8,
+    paddingBottom: 60,
+  },
+  clockMain: {
+    flex: 1,
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  clockLayout: {
+    width: "100%",
+    alignItems: "center",
+    gap: 8,
+    justifyContent: "center",
+    minHeight: 0,
+    marginTop: 4,
+    marginBottom: 6,
+  },
+  clockLayoutLandscape: {
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 0,
+  },
+  rotatingBlock: {
+    alignItems: "center",
+    paddingBottom: 8,
+  },
+  rotatingBlockLandscape: {
+    paddingBottom: 4,
+    alignItems: "center",
+  },
+  landscapeBlock: {
+    marginTop: 4,
+  },
+  controlsContainer: {
+    width: "100%",
+    alignItems: "center",
+    marginTop: 6,
+    paddingVertical: 0,
+    marginBottom: 8,
+    zIndex: 2,
+  },
+  controlsInline: {
+    width: "auto",
+    marginTop: 0,
+    paddingVertical: 0,
+    flexShrink: 1,
+    alignItems: "center",
+    alignSelf: "center",
+    maxWidth: "100%",
+    marginBottom: 8,
   },
   routineDetailBody: {
     paddingBottom: 78,
@@ -1442,19 +1596,22 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   clockWrap: {
-    flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 220,
+    minHeight: 120,
+  },
+  clockWrapLandscape: {
+    minHeight: 100,
   },
   activeClockWrap: {
-    flex: 0.95,
+    alignItems: "center",
+    justifyContent: "center",
   },
   timeCircle: {
-    width: 184,
-    height: 184,
-    borderRadius: 92,
-    borderWidth: 8,
+    width: 150,
+    height: 150,
+    borderRadius: 75,
+    borderWidth: 6,
     borderColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
@@ -1482,15 +1639,16 @@ const styles = StyleSheet.create({
     borderColor: "rgba(0,0,0,0.08)",
   },
   controls: {
-    minHeight: 98,
+    minHeight: 80,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-around",
-    paddingHorizontal: 26,
+    justifyContent: "center",
+    gap: 18,
+    paddingHorizontal: 20,
   },
   controlButton: {
-    width: 58,
-    height: 58,
+    width: 54,
+    height: 54,
     borderRadius: 18,
     backgroundColor: colors.backgroundFolder,
     alignItems: "center",
@@ -1505,7 +1663,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 24,
     right: 24,
-    bottom: 78,
+    bottom: 10,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-around",
@@ -1518,6 +1676,27 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
     zIndex: 3,
+  },
+  rotateButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.backgroundCard,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  rotateButtonRow: {
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    paddingHorizontal: 6,
+    paddingTop: 8,
+    paddingBottom: 10,
   },
   modeTab: {
     flex: 1,
