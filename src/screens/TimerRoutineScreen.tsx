@@ -1527,7 +1527,7 @@ const styles = StyleSheet.create({
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "center",
-    gap: 8,
+    gap: 12,
     paddingVertical: 0,
   },
   rotatingBlock: {
@@ -1535,11 +1535,11 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   rotatingBlockLandscape: {
-    paddingBottom: 4,
+    paddingBottom: 0,
     alignItems: "center",
   },
   landscapeBlock: {
-    marginTop: 4,
+    marginTop: 0,
   },
   controlsContainer: {
     width: "100%",
@@ -1557,7 +1557,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     alignSelf: "center",
     maxWidth: "100%",
-    marginBottom: 8,
+    marginBottom: 0,
+    flexDirection: "row",
+    justifyContent: "center",
+    flexWrap: "nowrap",
   },
   routineDetailBody: {
     paddingBottom: 78,
