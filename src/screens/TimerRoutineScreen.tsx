@@ -396,6 +396,7 @@ const TimerRoutineScreen: React.FC = () => {
   }, [celebrationPulse, confettiProgress, routineCompleteVisible]);
 
   useEffect(() => {
+    const sakuraActive = timerRunning || stopwatchRunning || routineRunning;
     const count = Math.min(sakuraPetals.length, sakuraProgress.length);
 
     if (!sakuraLoopsRef.current || sakuraLoopsRef.current.length !== count) {
@@ -421,7 +422,7 @@ const TimerRoutineScreen: React.FC = () => {
     sakuraTimersRef.current.forEach((timer) => clearTimeout(timer));
     sakuraTimersRef.current = [];
 
-    if (timerRunning || stopwatchRunning) {
+    if (sakuraActive) {
       sakuraProgress.forEach((value) => {
         value.stopAnimation();
         value.setValue(0);
@@ -441,7 +442,7 @@ const TimerRoutineScreen: React.FC = () => {
       sakuraTimersRef.current = [];
       loops.forEach((loop) => loop.stop());
     };
-  }, [sakuraPetals, sakuraProgress, timerRunning, stopwatchRunning]);
+  }, [routineRunning, sakuraPetals, sakuraProgress, stopwatchRunning, timerRunning]);
 
   const showMode = (nextMode: Mode) => {
     setMode(nextMode);
@@ -1177,52 +1178,55 @@ const TimerRoutineScreen: React.FC = () => {
   );
 
   const renderActiveRoutine = () => (
-    <View style={styles.screenBody}>
-      <View style={styles.detailTopBar}>
-        <TouchableOpacity
-          accessibilityLabel="Back to routine"
-          onPress={() => setRoutineView("detail")}
-          style={styles.iconButton}
-        >
-          <ArrowLeft size={28} color={colors.text} strokeWidth={2.8} />
-        </TouchableOpacity>
-      </View>
-      <View style={[styles.clockWrap, styles.activeClockWrap]}>
-        <View style={styles.timeCircle}>
-          <Text style={styles.timeText}>{formatTime(activeSecondsLeft)}</Text>
-        </View>
-      </View>
-      {renderControls(
-        routineRunning,
-        () => setRoutineRunning((running) => !running),
-        resetRoutine,
-        skipStep,
-      )}
-      <View style={styles.upNext}>
-        <Text numberOfLines={1} style={styles.currentStep}>
-          {activeStep?.name ?? "Done"}
-        </Text>
-        {activeStep && (
+    <View style={[styles.screenBody, styles.clockScene]}>
+      {routineRunning && renderSakuraOverlay()}
+      <View style={styles.clockContent}>
+        <View style={styles.detailTopBar}>
           <TouchableOpacity
-            accessibilityLabel="Skip current timer"
-            onPress={skipStep}
-            style={styles.skipTimerButton}
+            accessibilityLabel="Back to routine"
+            onPress={() => setRoutineView("detail")}
+            style={styles.iconButton}
           >
-            <SkipForward size={15} color={colors.primary} />
-            <Text style={styles.skipTimerText}>Skip Timer</Text>
+            <ArrowLeft size={28} color={colors.text} strokeWidth={2.8} />
           </TouchableOpacity>
-        )}
-        <View style={styles.upNextLine}>
-          <View style={styles.line} />
-          <Text style={styles.upNextLabel}>Up Next</Text>
-          <View style={styles.line} />
         </View>
-        <Text
-          numberOfLines={1}
-          style={[styles.nextStep, !upcomingStep && styles.completeNextStep]}
-        >
-          {upcomingStep?.name ?? "Complete"}
-        </Text>
+        <View style={[styles.clockWrap, styles.activeClockWrap]}>
+          <View style={styles.timeCircle}>
+            <Text style={styles.timeText}>{formatTime(activeSecondsLeft)}</Text>
+          </View>
+        </View>
+        {renderControls(
+          routineRunning,
+          () => setRoutineRunning((running) => !running),
+          resetRoutine,
+          skipStep,
+        )}
+        <View style={styles.upNext}>
+          <Text numberOfLines={1} style={styles.currentStep}>
+            {activeStep?.name ?? "Done"}
+          </Text>
+          {activeStep && (
+            <TouchableOpacity
+              accessibilityLabel="Skip current timer"
+              onPress={skipStep}
+              style={styles.skipTimerButton}
+            >
+              <SkipForward size={15} color={colors.primary} />
+              <Text style={styles.skipTimerText}>Skip Timer</Text>
+            </TouchableOpacity>
+          )}
+          <View style={styles.upNextLine}>
+            <View style={styles.line} />
+            <Text style={styles.upNextLabel}>Up Next</Text>
+            <View style={styles.line} />
+          </View>
+          <Text
+            numberOfLines={1}
+            style={[styles.nextStep, !upcomingStep && styles.completeNextStep]}
+          >
+            {upcomingStep?.name ?? "Complete"}
+          </Text>
+        </View>
       </View>
     </View>
   );
