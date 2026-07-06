@@ -9,6 +9,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  ViewStyle,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import {
@@ -827,8 +828,8 @@ const TimerRoutineScreen: React.FC = () => {
     </View>
   );
 
-  const renderSakuraOverlay = () => (
-    <View pointerEvents="none" style={styles.sakuraLayer}>
+  const renderSakuraOverlay = (extraStyle?: ViewStyle | ViewStyle[]) => (
+    <Animated.View pointerEvents="none" style={[styles.sakuraLayer, extraStyle]}> 
       {sakuraPetals.map((petal, index) => {
         const progress = sakuraProgress[index];
         const translateY = progress.interpolate({
@@ -871,7 +872,7 @@ const TimerRoutineScreen: React.FC = () => {
           />
         );
       })}
-    </View>
+    </Animated.View>
   );
 
   const renderModeTabs = () => (
@@ -907,6 +908,17 @@ const TimerRoutineScreen: React.FC = () => {
     ],
   } as const;
 
+  const overlayRotationStyle = {
+    transform: [
+      {
+        rotate: clockRotation.interpolate({
+          inputRange: [0, 1],
+          outputRange: ["0deg", "90deg"],
+        }),
+      },
+    ],
+  } as const;
+
   const toggleClockOrientation = () => {
     const next = !clockLandscape;
     setClockLandscape(next);
@@ -931,10 +943,11 @@ const TimerRoutineScreen: React.FC = () => {
 
   const renderTimer = () => (
     <View style={[styles.screenBody, styles.clockScene]}>
-      {(timerRunning || stopwatchRunning) && renderSakuraOverlay()}
       <View style={styles.clockContent}>
         {renderAppTopBar("Timer")}
         <View style={styles.clockMain}>
+          {(timerRunning || stopwatchRunning) &&
+            renderSakuraOverlay([styles.sakuraLayerClock, overlayRotationStyle])}
           <View style={[styles.clockLayout, clockLandscape && styles.clockLayoutLandscape]}>
             <Animated.View
               style={[
@@ -972,10 +985,11 @@ const TimerRoutineScreen: React.FC = () => {
 
   const renderStopwatch = () => (
     <View style={[styles.screenBody, styles.clockScene]}>
-      {(timerRunning || stopwatchRunning) && renderSakuraOverlay()}
       <View style={styles.clockContent}>
         {renderAppTopBar("Stopwatch")}
         <View style={styles.clockMain}>
+          {(timerRunning || stopwatchRunning) &&
+            renderSakuraOverlay([styles.sakuraLayerClock, overlayRotationStyle])}
           <View style={[styles.clockLayout, clockLandscape && styles.clockLayoutLandscape]}>
             <Animated.View
               style={[
@@ -1287,7 +1301,6 @@ const TimerRoutineScreen: React.FC = () => {
 
   const renderActiveRoutine = () => (
     <View style={[styles.screenBody, styles.clockScene]}>
-      {routineRunning && renderSakuraOverlay()}
       <View style={styles.clockContent}>
         <View style={styles.detailTopBar}>
           <TouchableOpacity
@@ -1299,6 +1312,7 @@ const TimerRoutineScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
         <View style={styles.clockMain}>
+          {routineRunning && renderSakuraOverlay([styles.sakuraLayerClock, overlayRotationStyle])}
           <View style={[styles.clockLayout, clockLandscape && styles.clockLayoutLandscape]}>
             <Animated.View
               style={[
@@ -1513,6 +1527,7 @@ const styles = StyleSheet.create({
     width: "100%",
     alignItems: "center",
     justifyContent: "center",
+    position: "relative",
   },
   clockLayout: {
     width: "100%",
@@ -1631,6 +1646,10 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
   sakuraLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+  },
+  sakuraLayerClock: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 1,
   },
