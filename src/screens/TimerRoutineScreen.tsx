@@ -219,6 +219,7 @@ const TimerRoutineScreen: React.FC = () => {
   const sakuraLoopsRef = useRef<Animated.CompositeAnimation[] | null>(null);
   const sakuraTimersRef = useRef<NodeJS.Timeout[]>([]);
   const undoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timerDefaultSeconds = 5 * 60;
   const [mode, setMode] = useState<Mode>("timer");
   const [routineView, setRoutineView] = useState<RoutineView>("list");
   const [routines, setRoutines] = useState<Routine[]>(routineSeed);
@@ -227,7 +228,7 @@ const TimerRoutineScreen: React.FC = () => {
   const [selectedColorFilter, setSelectedColorFilter] = useState<string | null>(null);
   const [stepTimeDrafts, setStepTimeDrafts] = useState<Record<string, string>>({});
   const [isEditingRoutine, setIsEditingRoutine] = useState(false);
-  const [timerSeconds, setTimerSeconds] = useState(5 * 60);
+  const [timerSeconds, setTimerSeconds] = useState(timerDefaultSeconds);
   const [timerRunning, setTimerRunning] = useState(false);
   const [stopwatchSeconds, setStopwatchSeconds] = useState(0);
   const [stopwatchRunning, setStopwatchRunning] = useState(false);
@@ -968,10 +969,18 @@ const TimerRoutineScreen: React.FC = () => {
             >
               {renderControls(
                 timerRunning,
-                () => setTimerRunning((running) => !running),
+                () => {
+                  setTimerRunning((running) => {
+                    if (timerSeconds <= 0) {
+                      setTimerSeconds(timerDefaultSeconds);
+                      return true;
+                    }
+                    return !running;
+                  });
+                },
                 () => {
                   setTimerRunning(false);
-                  setTimerSeconds(5 * 60);
+                  setTimerSeconds(timerDefaultSeconds);
                 },
               )}
             </View>
