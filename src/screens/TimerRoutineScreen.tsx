@@ -1104,55 +1104,85 @@ const TimerRoutineScreen: React.FC = () => {
           contentContainerStyle={styles.stepsScrollContent}
           showsVerticalScrollIndicator={false}
         >
-          {selectedRoutine.steps.map((step) => (
-            <View key={step.id} style={styles.stepRow}>
-              <TextInput
-                value={step.name}
-                onChangeText={(name) => updateStep(step.id, { name })}
-                editable={isEditingRoutine}
-                style={[
-                  styles.stepText,
-                  styles.stepNameInput,
-                  !isEditingRoutine && styles.lockedText,
-                ]}
-              />
-              <TextInput
-                value={stepTimeDrafts[step.id] ?? formatTime(step.seconds)}
-                onChangeText={(value) =>
-                  setStepTimeDrafts((drafts) => ({
-                    ...drafts,
-                    [step.id]: value,
-                  }))
-                }
-                onEndEditing={({ nativeEvent }) => {
-                  updateStep(step.id, {
-                    seconds: parseTimerInput(nativeEvent.text, step.seconds),
-                  });
-                  setStepTimeDrafts((drafts) => {
-                    const nextDrafts = { ...drafts };
-                    delete nextDrafts[step.id];
-                    return nextDrafts;
-                  });
-                }}
-                editable={isEditingRoutine}
-                keyboardType="numbers-and-punctuation"
-                style={[
-                  styles.stepText,
-                  styles.stepTimeInput,
-                  !isEditingRoutine && styles.lockedText,
-                ]}
-              />
-              {isEditingRoutine && (
-                <TouchableOpacity
-                  accessibilityLabel="Delete step"
-                  onPress={() => deleteStep(step.id)}
-                  style={styles.stepIcon}
-                >
-                  <Trash2 size={24} color={colors.primary} strokeWidth={2.4} />
-                </TouchableOpacity>
-              )}
-            </View>
-          ))}
+          {selectedRoutine.steps.map((step) => {
+            const isActiveStep = routineRunning && step.id === activeStep?.id;
+            const timeDisplay = isActiveStep
+              ? formatTime(activeSecondsLeft)
+              : formatTime(step.seconds);
+
+            return (
+              <View
+                key={step.id}
+                style={[styles.stepRow, isActiveStep && styles.activeStepRow]}
+              >
+                {isEditingRoutine ? (
+                  <TextInput
+                    value={step.name}
+                    onChangeText={(name) => updateStep(step.id, { name })}
+                    editable={isEditingRoutine}
+                    style={[
+                      styles.stepText,
+                      styles.stepNameInput,
+                      !isEditingRoutine && styles.lockedText,
+                    ]}
+                  />
+                ) : (
+                  <Text numberOfLines={1} style={[styles.stepText, styles.stepNameInput]}>
+                    {step.name}
+                  </Text>
+                )}
+
+                {isEditingRoutine ? (
+                  <TextInput
+                    value={stepTimeDrafts[step.id] ?? formatTime(step.seconds)}
+                    onChangeText={(value) =>
+                      setStepTimeDrafts((drafts) => ({
+                        ...drafts,
+                        [step.id]: value,
+                      }))
+                    }
+                    onEndEditing={({ nativeEvent }) => {
+                      updateStep(step.id, {
+                        seconds: parseTimerInput(nativeEvent.text, step.seconds),
+                      });
+                      setStepTimeDrafts((drafts) => {
+                        const nextDrafts = { ...drafts };
+                        delete nextDrafts[step.id];
+                        return nextDrafts;
+                      });
+                    }}
+                    editable={isEditingRoutine}
+                    keyboardType="numbers-and-punctuation"
+                    style={[
+                      styles.stepText,
+                      styles.stepTimeInput,
+                      !isEditingRoutine && styles.lockedText,
+                    ]}
+                  />
+                ) : (
+                  <Text
+                    style={[
+                      styles.stepText,
+                      styles.stepTimeValue,
+                      isActiveStep && styles.activeStepTime,
+                    ]}
+                  >
+                    {timeDisplay}
+                  </Text>
+                )}
+
+                {isEditingRoutine && (
+                  <TouchableOpacity
+                    accessibilityLabel="Delete step"
+                    onPress={() => deleteStep(step.id)}
+                    style={styles.stepIcon}
+                  >
+                    <Trash2 size={24} color={colors.primary} strokeWidth={2.4} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            );
+          })}
         </ScrollView>
       </View>
       {isEditingRoutine && (
@@ -1168,7 +1198,6 @@ const TimerRoutineScreen: React.FC = () => {
       {renderControls(
         routineRunning,
         () => {
-          setRoutineView("active");
           setRoutineRunning((running) => !running);
         },
         resetRoutine,
@@ -1689,6 +1718,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
   },
+  activeStepRow: {
+    borderWidth: 1,
+    borderColor: colors.primary,
+    backgroundColor: colors.backgroundFolder,
+  },
   stepText: {
     color: colors.text,
     fontSize: 14,
@@ -1705,6 +1739,15 @@ const styles = StyleSheet.create({
   stepTimeInput: {
     width: 104,
     textAlign: "center",
+  },
+  stepTimeValue: {
+    width: 104,
+    textAlign: "center",
+    fontVariant: ["tabular-nums"],
+  },
+  activeStepTime: {
+    color: colors.primary,
+    fontWeight: "700",
   },
   stepIcon: {
     width: 34,
