@@ -33,6 +33,20 @@ import DeleteConfirmationPopup from "../components/DeleteConfirmationPopup";
 
 type Mode = "timer" | "routine" | "stopwatch";
 type RoutineView = "list" | "detail" | "active";
+type SakuraPetalConfig = {
+  id: number;
+  left: number;
+  size: number;
+  duration: number;
+  delay: number;
+  drift: number;
+  spread: number;
+  start: number;
+  color: string;
+  opacity: number;
+  rotation: number;
+  scale: number;
+};
 type UndoDelete =
   | {
       type: "routine";
@@ -64,6 +78,14 @@ const confettiPieces = Array.from({ length: 18 }, (_, index) => ({
   fall: 150 + (index % 5) * 18,
   rotate: `${90 + index * 23}deg`,
 }));
+
+const sakuraPalette = [
+  "#F8B4C4",
+  "#F6A1B0",
+  "#F3A7D6",
+  "#E9B8FF",
+  "#D4E4FF",
+];
 
 const seedTimestamp = 1700000000000;
 
@@ -172,6 +194,27 @@ const TimerRoutineScreen: React.FC = () => {
   const lastTouchAtRef = useRef(Date.now());
   const celebrationPulse = useRef(new Animated.Value(0)).current;
   const confettiProgress = useRef(new Animated.Value(0)).current;
+  const sakuraPetals = useMemo<SakuraPetalConfig[]>(
+    () =>
+      Array.from({ length: 13 }, (_, index) => ({
+        id: index,
+        left: 2 + ((index * 9) % 96),
+        size: 12 + (index % 5) * 2,
+        duration: 17000 + (index % 5) * 1800,
+        delay: (index % 10) * 260,
+        drift: (index % 2 === 0 ? -1 : 1) * (18 + index * 1.05),
+        spread: 760 + (index % 3) * 90,
+        start: -120 - index * 10,
+        color: sakuraPalette[index % sakuraPalette.length],
+        opacity: 0.55 + (index % 4) * 0.05,
+        rotation: 10 + index * 9,
+        scale: 0.82 + (index % 3) * 0.1,
+      })),
+    [],
+  );
+  const sakuraProgress = useRef(sakuraPetals.map(() => new Animated.Value(0))).current;
+  const sakuraLoopsRef = useRef<Animated.CompositeAnimation[] | null>(null);
+  const sakuraTimersRef = useRef<NodeJS.Timeout[]>([]);
   const undoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [mode, setMode] = useState<Mode>("timer");
   const [routineView, setRoutineView] = useState<RoutineView>("list");
@@ -351,6 +394,54 @@ const TimerRoutineScreen: React.FC = () => {
       confettiAnimation.stop();
     };
   }, [celebrationPulse, confettiProgress, routineCompleteVisible]);
+
+  useEffect(() => {
+    const count = Math.min(sakuraPetals.length, sakuraProgress.length);
+
+    if (!sakuraLoopsRef.current || sakuraLoopsRef.current.length !== count) {
+      sakuraLoopsRef.current?.forEach((loop) => loop.stop());
+      sakuraLoopsRef.current = Array.from({ length: count }, (_, index) => {
+        const petal = sakuraPetals[index];
+        const value = sakuraProgress[index];
+        return Animated.loop(
+          Animated.timing(value, {
+            toValue: 1,
+            duration: petal ? petal.duration : 12000,
+            easing: Easing.linear,
+            useNativeDriver: true,
+          }),
+          { resetBeforeIteration: true },
+        );
+      });
+    }
+
+    const loops = sakuraLoopsRef.current;
+    if (!loops) return;
+
+    sakuraTimersRef.current.forEach((timer) => clearTimeout(timer));
+    sakuraTimersRef.current = [];
+
+    if (timerRunning || stopwatchRunning) {
+      sakuraProgress.forEach((value) => {
+        value.stopAnimation();
+        value.setValue(0);
+      });
+      loops.forEach((loop, index) => {
+        const petal = sakuraPetals[index];
+        if (!petal) return;
+        const startTimer = setTimeout(() => loop.start(), petal.delay);
+        sakuraTimersRef.current.push(startTimer);
+      });
+    } else {
+      loops.forEach((loop) => loop.stop());
+    }
+
+    return () => {
+      sakuraTimersRef.current.forEach((timer) => clearTimeout(timer));
+      sakuraTimersRef.current = [];
+      loops.forEach((loop) => loop.stop());
+    };
+  }, [sakuraPetals, sakuraProgress, timerRunning, stopwatchRunning]);
 
   const showMode = (nextMode: Mode) => {
     setMode(nextMode);
@@ -733,6 +824,53 @@ const TimerRoutineScreen: React.FC = () => {
     </View>
   );
 
+  const renderSakuraOverlay = () => (
+    <View pointerEvents="none" style={styles.sakuraLayer}>
+      {sakuraPetals.map((petal, index) => {
+        const progress = sakuraProgress[index];
+        const translateY = progress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [petal.start, petal.spread],
+        });
+        const translateX = progress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, petal.drift],
+        });
+        const rotate = progress.interpolate({
+          inputRange: [0, 1],
+          outputRange: [`${petal.rotation}deg`, `${petal.rotation + 120}deg`],
+        });
+        const opacity = progress.interpolate({
+          inputRange: [0, 0.05, 0.95, 1],
+          outputRange: [0, petal.opacity, petal.opacity, petal.opacity],
+        });
+
+        return (
+          <Animated.View
+            key={petal.id}
+            style={[
+              styles.sakuraPetal,
+              {
+                left: `${petal.left}%`,
+                width: petal.size,
+                height: petal.size,
+                backgroundColor: petal.color,
+                borderRadius: petal.size / 2,
+                opacity,
+                transform: [
+                  { translateY },
+                  { translateX },
+                  { rotate },
+                  { scale: petal.scale },
+                ],
+              },
+            ]}
+          />
+        );
+      })}
+    </View>
+  );
+
   const renderModeTabs = () => (
     <View style={styles.modeTabs}>
       {(["timer", "routine", "stopwatch"] as Mode[]).map((item) => (
@@ -750,41 +888,47 @@ const TimerRoutineScreen: React.FC = () => {
   );
 
   const renderTimer = () => (
-    <View style={styles.screenBody}>
-      {renderAppTopBar("Timer")}
-      <View style={styles.clockWrap}>
-        <View style={styles.timeCircle}>
-          <Text style={styles.timeText}>{formatTime(timerSeconds)}</Text>
+    <View style={[styles.screenBody, styles.clockScene]}>
+      {(timerRunning || stopwatchRunning) && renderSakuraOverlay()}
+      <View style={styles.clockContent}>
+        {renderAppTopBar("Timer")}
+        <View style={styles.clockWrap}>
+          <View style={styles.timeCircle}>
+            <Text style={styles.timeText}>{formatTime(timerSeconds)}</Text>
+          </View>
         </View>
+        {renderControls(
+          timerRunning,
+          () => setTimerRunning((running) => !running),
+          () => {
+            setTimerRunning(false);
+            setTimerSeconds(5 * 60);
+          },
+        )}
       </View>
-      {renderControls(
-        timerRunning,
-        () => setTimerRunning((running) => !running),
-        () => {
-          setTimerRunning(false);
-          setTimerSeconds(5 * 60);
-        },
-      )}
       {renderModeTabs()}
     </View>
   );
 
   const renderStopwatch = () => (
-    <View style={styles.screenBody}>
-      {renderAppTopBar("Stopwatch")}
-      <View style={styles.clockWrap}>
-        <View style={styles.timeCircle}>
-          <Text style={styles.timeText}>{formatTime(stopwatchSeconds)}</Text>
+    <View style={[styles.screenBody, styles.clockScene]}>
+      {(timerRunning || stopwatchRunning) && renderSakuraOverlay()}
+      <View style={styles.clockContent}>
+        {renderAppTopBar("Stopwatch")}
+        <View style={styles.clockWrap}>
+          <View style={styles.timeCircle}>
+            <Text style={styles.timeText}>{formatTime(stopwatchSeconds)}</Text>
+          </View>
         </View>
+        {renderControls(
+          stopwatchRunning,
+          () => setStopwatchRunning((running) => !running),
+          () => {
+            setStopwatchRunning(false);
+            setStopwatchSeconds(0);
+          },
+        )}
       </View>
-      {renderControls(
-        stopwatchRunning,
-        () => setStopwatchRunning((running) => !running),
-        () => {
-          setStopwatchRunning(false);
-          setStopwatchSeconds(0);
-        },
-      )}
       {renderModeTabs()}
     </View>
   );
@@ -1219,6 +1363,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 18,
     paddingBottom: 158,
+    position: "relative",
+  },
+  clockScene: {
+    overflow: "hidden",
+    position: "relative",
+  },
+  clockContent: {
+    zIndex: 2,
   },
   routineDetailBody: {
     paddingBottom: 78,
@@ -1285,6 +1437,17 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
   },
+  sakuraLayer: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+  },
+  sakuraPetal: {
+    position: "absolute",
+    top: 0,
+    borderRadius: 999,
+    borderWidth: 0.35,
+    borderColor: "rgba(0,0,0,0.08)",
+  },
   controls: {
     minHeight: 98,
     flexDirection: "row",
@@ -1321,6 +1484,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 5,
+    zIndex: 3,
   },
   modeTab: {
     flex: 1,
