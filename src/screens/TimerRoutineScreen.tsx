@@ -943,11 +943,11 @@ const TimerRoutineScreen: React.FC = () => {
 
   const renderTimer = () => (
     <View style={[styles.screenBody, styles.clockScene]}>
+      {(timerRunning || stopwatchRunning) &&
+        renderSakuraOverlay([styles.sakuraLayerFull, overlayRotationStyle])}
       <View style={styles.clockContent}>
         {renderAppTopBar("Timer")}
         <View style={styles.clockMain}>
-          {(timerRunning || stopwatchRunning) &&
-            renderSakuraOverlay([styles.sakuraLayerClock, overlayRotationStyle])}
           <View style={[styles.clockLayout, clockLandscape && styles.clockLayoutLandscape]}>
             <Animated.View
               style={[
@@ -985,11 +985,11 @@ const TimerRoutineScreen: React.FC = () => {
 
   const renderStopwatch = () => (
     <View style={[styles.screenBody, styles.clockScene]}>
+      {(timerRunning || stopwatchRunning) &&
+        renderSakuraOverlay([styles.sakuraLayerFull, overlayRotationStyle])}
       <View style={styles.clockContent}>
         {renderAppTopBar("Stopwatch")}
         <View style={styles.clockMain}>
-          {(timerRunning || stopwatchRunning) &&
-            renderSakuraOverlay([styles.sakuraLayerClock, overlayRotationStyle])}
           <View style={[styles.clockLayout, clockLandscape && styles.clockLayoutLandscape]}>
             <Animated.View
               style={[
@@ -1301,6 +1301,7 @@ const TimerRoutineScreen: React.FC = () => {
 
   const renderActiveRoutine = () => (
     <View style={[styles.screenBody, styles.clockScene]}>
+      {routineRunning && renderSakuraOverlay([styles.sakuraLayerFull, overlayRotationStyle])}
       <View style={styles.clockContent}>
         <View style={styles.detailTopBar}>
           <TouchableOpacity
@@ -1312,7 +1313,6 @@ const TimerRoutineScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
         <View style={styles.clockMain}>
-          {routineRunning && renderSakuraOverlay([styles.sakuraLayerClock, overlayRotationStyle])}
           <View style={[styles.clockLayout, clockLandscape && styles.clockLayoutLandscape]}>
             <Animated.View
               style={[
@@ -1512,7 +1512,7 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   clockScene: {
-    overflow: "hidden",
+    overflow: "visible",
     position: "relative",
   },
   clockContent: {
@@ -1652,6 +1652,14 @@ const styles = StyleSheet.create({
   sakuraLayerClock: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 1,
+  },
+  sakuraLayerFull: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 1,
+    left: -200,
+    right: -200,
+    top: -40,
+    bottom: -40,
   },
   sakuraPetal: {
     position: "absolute",
