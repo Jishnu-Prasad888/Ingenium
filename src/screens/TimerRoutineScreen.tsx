@@ -1598,20 +1598,20 @@ const styles = StyleSheet.create({
   clockWrap: {
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 120,
+    minHeight: 150,
   },
   clockWrapLandscape: {
-    minHeight: 100,
+    minHeight: 130,
   },
   activeClockWrap: {
     alignItems: "center",
     justifyContent: "center",
   },
   timeCircle: {
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    borderWidth: 6,
+    width: 188,
+    height: 188,
+    borderRadius: 94,
+    borderWidth: 7,
     borderColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
