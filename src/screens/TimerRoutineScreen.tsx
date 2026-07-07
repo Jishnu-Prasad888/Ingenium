@@ -230,8 +230,14 @@ const TimerRoutineScreen: React.FC = () => {
   const [isEditingRoutine, setIsEditingRoutine] = useState(false);
   const [timerSeconds, setTimerSeconds] = useState(timerDefaultSeconds);
   const [timerRunning, setTimerRunning] = useState(false);
+  const [timerEditDraft, setTimerEditDraft] = useState(formatTime(timerDefaultSeconds));
+  const [timerEditing, setTimerEditing] = useState(false);
+  const timerEditInputRef = useRef<TextInput>(null);
   const [stopwatchSeconds, setStopwatchSeconds] = useState(0);
   const [stopwatchRunning, setStopwatchRunning] = useState(false);
+  const [stopwatchEditDraft, setStopwatchEditDraft] = useState(formatTime(0));
+  const [stopwatchEditing, setStopwatchEditing] = useState(false);
+  const stopwatchEditInputRef = useRef<TextInput>(null);
   const [activeStepIndex, setActiveStepIndex] = useState(0);
   const [activeSecondsLeft, setActiveSecondsLeft] = useState(
     routineSeed[0].steps[0].seconds,
@@ -295,6 +301,18 @@ const TimerRoutineScreen: React.FC = () => {
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (timerEditing) {
+      requestAnimationFrame(() => timerEditInputRef.current?.focus());
+    }
+  }, [timerEditing]);
+
+  useEffect(() => {
+    if (stopwatchEditing) {
+      requestAnimationFrame(() => stopwatchEditInputRef.current?.focus());
+    }
+  }, [stopwatchEditing]);
 
   useEffect(() => {
     if (!timerRunning) return;
@@ -942,6 +960,16 @@ const TimerRoutineScreen: React.FC = () => {
     </TouchableOpacity>
   );
 
+  const renderEditButton = (editing: boolean, onToggle: () => void) => (
+    <TouchableOpacity
+      accessibilityLabel={editing ? "Close time edit" : "Edit time"}
+      onPress={onToggle}
+      style={styles.rotateButton}
+    >
+      <Edit3 size={18} color={colors.text} />
+    </TouchableOpacity>
+  );
+
   const renderTimer = () => (
     <View style={[styles.screenBody, styles.clockScene]}>
       {(timerRunning || stopwatchRunning) &&
@@ -960,7 +988,33 @@ const TimerRoutineScreen: React.FC = () => {
             >
               <View style={[styles.clockWrap, clockLandscape && styles.clockWrapLandscape]}>
                 <View style={styles.timeCircle}>
-                  <Text style={styles.timeText}>{formatTime(timerSeconds)}</Text>
+                  {timerEditing ? (
+                    <TextInput
+                      ref={timerEditInputRef}
+                      value={timerEditDraft}
+                      onChangeText={setTimerEditDraft}
+                      onSubmitEditing={() => {
+                        const next = parseTimerInput(timerEditDraft, timerDefaultSeconds);
+                        setTimerRunning(false);
+                        setTimerSeconds(next);
+                        setTimerEditDraft(formatTime(next));
+                        setTimerEditing(false);
+                      }}
+                      onBlur={() => {
+                        const next = parseTimerInput(timerEditDraft, timerDefaultSeconds);
+                        setTimerRunning(false);
+                        setTimerSeconds(next);
+                        setTimerEditDraft(formatTime(next));
+                        setTimerEditing(false);
+                      }}
+                      keyboardType="numeric"
+                      style={styles.timeEditInline}
+                      autoFocus
+                      returnKeyType="done"
+                    />
+                  ) : (
+                    <Text style={styles.timeText}>{formatTime(timerSeconds)}</Text>
+                  )}
                 </View>
               </View>
             </Animated.View>
@@ -973,6 +1027,7 @@ const TimerRoutineScreen: React.FC = () => {
                   setTimerRunning((running) => {
                     if (timerSeconds <= 0) {
                       setTimerSeconds(timerDefaultSeconds);
+                      setTimerEditDraft(formatTime(timerDefaultSeconds));
                       return true;
                     }
                     return !running;
@@ -981,11 +1036,22 @@ const TimerRoutineScreen: React.FC = () => {
                 () => {
                   setTimerRunning(false);
                   setTimerSeconds(timerDefaultSeconds);
+                  setTimerEditDraft(formatTime(timerDefaultSeconds));
                 },
               )}
             </View>
           </View>
-          <View style={styles.rotateButtonRow}>{renderRotateButton()}</View>
+          <View style={styles.rotateButtonRow}>
+            {renderEditButton(timerEditing, () => {
+              setTimerEditing((current) => {
+                const next = !current;
+                setTimerRunning(false);
+                setTimerEditDraft(formatTime(timerSeconds));
+                return next;
+              });
+            })}
+            {renderRotateButton()}
+          </View>
         </View>
       </View>
       {renderModeTabs()}
@@ -1010,7 +1076,33 @@ const TimerRoutineScreen: React.FC = () => {
             >
               <View style={[styles.clockWrap, clockLandscape && styles.clockWrapLandscape]}>
                 <View style={styles.timeCircle}>
-                  <Text style={styles.timeText}>{formatTime(stopwatchSeconds)}</Text>
+                  {stopwatchEditing ? (
+                    <TextInput
+                      ref={stopwatchEditInputRef}
+                      value={stopwatchEditDraft}
+                      onChangeText={setStopwatchEditDraft}
+                      onSubmitEditing={() => {
+                        const next = parseTimerInput(stopwatchEditDraft, 0);
+                        setStopwatchRunning(false);
+                        setStopwatchSeconds(next);
+                        setStopwatchEditDraft(formatTime(next));
+                        setStopwatchEditing(false);
+                      }}
+                      onBlur={() => {
+                        const next = parseTimerInput(stopwatchEditDraft, 0);
+                        setStopwatchRunning(false);
+                        setStopwatchSeconds(next);
+                        setStopwatchEditDraft(formatTime(next));
+                        setStopwatchEditing(false);
+                      }}
+                      keyboardType="numeric"
+                      style={styles.timeEditInline}
+                      autoFocus
+                      returnKeyType="done"
+                    />
+                  ) : (
+                    <Text style={styles.timeText}>{formatTime(stopwatchSeconds)}</Text>
+                  )}
                 </View>
               </View>
             </Animated.View>
@@ -1027,7 +1119,17 @@ const TimerRoutineScreen: React.FC = () => {
               )}
             </View>
           </View>
-          <View style={styles.rotateButtonRow}>{renderRotateButton()}</View>
+          <View style={styles.rotateButtonRow}>
+            {renderEditButton(stopwatchEditing, () => {
+              setStopwatchEditing((current) => {
+                const next = !current;
+                setStopwatchRunning(false);
+                setStopwatchEditDraft(formatTime(stopwatchSeconds));
+                return next;
+              });
+            })}
+            {renderRotateButton()}
+          </View>
         </View>
       </View>
       {renderModeTabs()}
@@ -1625,19 +1727,19 @@ const styles = StyleSheet.create({
   clockWrap: {
     alignItems: "center",
     justifyContent: "center",
-    minHeight: 150,
+    minHeight: 170,
   },
   clockWrapLandscape: {
-    minHeight: 130,
+    minHeight: 150,
   },
   activeClockWrap: {
     alignItems: "center",
     justifyContent: "center",
   },
   timeCircle: {
-    width: 188,
-    height: 188,
-    borderRadius: 94,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
     borderWidth: 7,
     borderColor: colors.primary,
     alignItems: "center",
@@ -1651,8 +1753,16 @@ const styles = StyleSheet.create({
   },
   timeText: {
     color: colors.text,
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: "600",
+  },
+  timeEditInline: {
+    color: colors.text,
+    fontSize: 20,
+    fontWeight: "600",
+    width: 130,
+    textAlign: "center",
+    paddingVertical: 0,
   },
   sakuraLayer: {
     ...StyleSheet.absoluteFillObject,
@@ -1733,6 +1843,8 @@ const styles = StyleSheet.create({
     width: "100%",
     flexDirection: "row",
     justifyContent: "flex-end",
+    alignItems: "center",
+    gap: 8,
     paddingHorizontal: 6,
     paddingTop: 8,
     paddingBottom: 10,
