@@ -1,5 +1,6 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Animated,
   ScrollView,
   StyleSheet,
   Text,
@@ -19,6 +20,7 @@ import {
 } from "lucide-react-native";
 import { colors } from "../theme/colors";
 import { useApp } from "../context/AppContext";
+import { Easing } from "react-native";
 
 type Mode = "timer" | "routine" | "stopwatch";
 type RoutineView = "list" | "detail" | "active";
@@ -92,6 +94,8 @@ const formatTime = (totalSeconds: number) => {
 
 const TimerRoutineScreen: React.FC = () => {
   const { setCurrentScreen } = useApp();
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const translateAnim = useRef(new Animated.Value(14)).current;
   const [mode, setMode] = useState<Mode>("timer");
   const [routineView, setRoutineView] = useState<RoutineView>("list");
   const [routines, setRoutines] = useState<Routine[]>(routineSeed);
@@ -110,6 +114,25 @@ const TimerRoutineScreen: React.FC = () => {
     () => routines.find((routine) => routine.id === selectedRoutineId) ?? routines[0],
     [routines, selectedRoutineId],
   );
+
+  useEffect(() => {
+    fadeAnim.setValue(0);
+    translateAnim.setValue(14);
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 420,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateAnim, {
+        toValue: 0,
+        duration: 420,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [fadeAnim, translateAnim]);
 
   const activeStep = selectedRoutine.steps[activeStepIndex];
   const upcomingStep = selectedRoutine.steps[activeStepIndex + 1];
@@ -497,9 +520,13 @@ const TimerRoutineScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      {mode === "timer" && renderTimer()}
-      {mode === "routine" && renderRoutine()}
-      {mode === "stopwatch" && renderStopwatch()}
+      <Animated.View
+        style={{ flex: 1, opacity: fadeAnim, transform: [{ translateY: translateAnim }] }}
+      >
+        {mode === "timer" && renderTimer()}
+        {mode === "routine" && renderRoutine()}
+        {mode === "stopwatch" && renderStopwatch()}
+      </Animated.View>
     </SafeAreaView>
   );
 };
