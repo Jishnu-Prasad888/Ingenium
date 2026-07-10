@@ -8,7 +8,6 @@ import NoteEditorScreen from "../screens/NoteEditorScreen";
 import ShareScreen from "../screens/ShareScreen";
 import BottomNavigationBar from "./BottomNavigationBar";
 import SyncIndicator from "./SyncIndicator";
-import DebugDatabaseInfo from "./DebugDatabaseInfo";
 import { colors } from "../theme/colors";
 import DeepLinkHandler from "./DeepLinkHandler";
 import QueryNotesScreen from "../screens/QueryNotesScreen";
@@ -40,7 +39,6 @@ export const AppContent: React.FC = () => {
           {currentScreen === "timer-routine" && <TimerRoutineScreen />}
           {currentScreen !== "timer-routine" && <BottomNavigationBar />}
           <SyncIndicator />
-          <DebugDatabaseInfo />
         </>
       )}
     </View>
