@@ -96,6 +96,8 @@ const TimerRoutineScreen: React.FC = () => {
   const { setCurrentScreen } = useApp();
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const translateAnim = useRef(new Animated.Value(14)).current;
+  const rotationAnim = useRef(new Animated.Value(0)).current;
+  const [isLandscape, setIsLandscape] = useState(false);
   const [mode, setMode] = useState<Mode>("timer");
   const [routineView, setRoutineView] = useState<RoutineView>("list");
   const [routines, setRoutines] = useState<Routine[]>(routineSeed);
@@ -133,6 +135,19 @@ const TimerRoutineScreen: React.FC = () => {
       }),
     ]).start();
   }, [fadeAnim, translateAnim]);
+
+  const toggleOrientation = () => {
+    setIsLandscape((prev) => {
+      const next = !prev;
+      Animated.timing(rotationAnim, {
+        toValue: next ? 1 : 0,
+        duration: 320,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+      return next;
+    });
+  };
 
   const activeStep = selectedRoutine.steps[activeStepIndex];
   const upcomingStep = selectedRoutine.steps[activeStepIndex + 1];
@@ -255,7 +270,7 @@ const TimerRoutineScreen: React.FC = () => {
     );
   };
 
-  const renderAppTopBar = (title: string) => (
+  const renderAppTopBar = (title: string, rightSlot?: React.ReactNode) => (
     <View style={styles.topBar}>
       <TouchableOpacity
         accessibilityLabel="Back to notes"
@@ -267,7 +282,7 @@ const TimerRoutineScreen: React.FC = () => {
       <Text numberOfLines={1} style={styles.topTitle}>
         {title}
       </Text>
-      <View style={styles.iconButton} />
+      {rightSlot || <View style={styles.iconButton} />}
     </View>
   );
 
@@ -326,11 +341,36 @@ const TimerRoutineScreen: React.FC = () => {
 
   const renderTimer = () => (
     <View style={styles.screenBody}>
-      {renderAppTopBar("Timer")}
+      {renderAppTopBar(
+        "Timer",
+        <TouchableOpacity
+          accessibilityLabel={
+            isLandscape ? "Un-rotate clock" : "Rotate clock"
+          }
+          onPress={toggleOrientation}
+          style={styles.iconButton}
+        >
+          <RotateCcw size={24} color={colors.primary} />
+        </TouchableOpacity>,
+      )}
       <View style={styles.clockWrap}>
-        <View style={styles.timeCircle}>
+        <Animated.View
+          style={[
+            styles.timeCircle,
+            {
+              transform: [
+                {
+                  rotate: rotationAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ["0deg", "90deg"],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
           <Text style={styles.timeText}>{formatTime(timerSeconds)}</Text>
-        </View>
+        </Animated.View>
       </View>
       {renderControls(
         timerRunning,
