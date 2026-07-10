@@ -21,7 +21,7 @@ import { formatDate } from "../utils/helpers";
 import Markdown from "react-native-markdown-display";
 import { Modal } from "react-native";
 import { ExternalLink, Maximize2, CircleX } from "lucide-react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import MoveNoteModal from "../components/MoveNoteModal";
 
 interface MarkdownRendererProps {
@@ -173,29 +173,37 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
 
       if (markdownContent.trim()) {
         renderedElements.push(
-          <Markdown
-            key={`md-${startLine}`}
-            style={{
-              body: { color: colors.text, fontSize: 16, lineHeight: 24 },
-              heading1: {
-                fontSize: 28,
-                color: colors.primary,
-                fontWeight: "800" as const,
-                marginTop: 24,
-                marginBottom: 12,
-              },
-              heading2: {
-                fontSize: 24,
-                fontWeight: "700" as const,
-                marginTop: 20,
-                marginBottom: 10,
-              },
-              heading3: {
-                fontSize: 20,
-                fontWeight: "600" as const,
-                marginTop: 16,
-                marginBottom: 8,
-              },
+              <Markdown
+                key={`md-${startLine}`}
+                style={{
+                  body: {
+                    color: colors.text,
+                    fontSize: 16,
+                    lineHeight: 24,
+                    fontFamily: "SpaceGrotesk_500Medium",
+                  },
+                  heading1: {
+                    fontSize: 28,
+                    color: colors.primary,
+                    fontWeight: "800" as const,
+                    fontFamily: "SpaceGrotesk_700Bold",
+                    marginTop: 24,
+                    marginBottom: 12,
+                  },
+                  heading2: {
+                    fontSize: 24,
+                    fontWeight: "700" as const,
+                    fontFamily: "SpaceGrotesk_700Bold",
+                    marginTop: 20,
+                    marginBottom: 10,
+                  },
+                  heading3: {
+                    fontSize: 20,
+                    fontWeight: "600" as const,
+                    fontFamily: "SpaceGrotesk_600SemiBold",
+                    marginTop: 16,
+                    marginBottom: 8,
+                  },
               bullet_list: { marginVertical: 8, marginLeft: 20 },
               ordered_list: { marginVertical: 8, marginLeft: 20 },
               list_item: { marginVertical: 4 },
@@ -236,7 +244,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
 const NoteEditorScreen: React.FC = () => {
   const { width } = useWindowDimensions();
   const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const [bottomBarHeight, setBottomBarHeight] = useState(0);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     const showSub = Keyboard.addListener("keyboardDidShow", () =>
@@ -252,6 +260,7 @@ const NoteEditorScreen: React.FC = () => {
     };
   }, []);
   const showButtonText = width >= 420;
+  const contentPaddingBottom = insets.bottom + 160;
   const {
     notes,
     folders,
@@ -298,14 +307,21 @@ const NoteEditorScreen: React.FC = () => {
         borderRadius: 10,
         backgroundColor: colors.backgroundCard,
         borderWidth: 1,
-        borderColor: colors.textSecondary,
+        borderColor: colors.border,
         alignItems: "center",
         justifyContent: "center",
         minWidth: 30,
       }}
     >
       {typeof label === "string" ? (
-        <Text style={{ color: colors.text, fontWeight: "600" }}>{label}</Text>
+        <Text
+          style={{
+            color: colors.text,
+            fontFamily: "SpaceGrotesk_600SemiBold",
+          }}
+        >
+          {label}
+        </Text>
       ) : (
         label
       )}
@@ -494,20 +510,32 @@ const NoteEditorScreen: React.FC = () => {
       {hasUnsavedChanges && (
         <View
           style={{
-            backgroundColor: colors.warning,
+            backgroundColor: colors.warningLight,
             paddingHorizontal: 20,
-            paddingVertical: 8,
+            paddingVertical: 10,
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "space-between",
+            borderBottomWidth: 1,
+            borderColor: colors.border,
           }}
         >
-          <Text style={{ color: colors.white, fontSize: 12 }}>
+          <Text
+            style={{
+              color: colors.text,
+              fontSize: 13,
+              fontFamily: "SpaceGrotesk_600SemiBold",
+            }}
+          >
             Unsaved changes
           </Text>
           <TouchableOpacity onPress={handleSaveNow}>
             <Text
-              style={{ color: colors.white, fontSize: 12, fontWeight: "bold" }}
+              style={{
+                color: colors.text,
+                fontSize: 12,
+                fontFamily: "SpaceGrotesk_700Bold",
+              }}
             >
               SAVE NOW
             </Text>
@@ -530,18 +558,25 @@ const NoteEditorScreen: React.FC = () => {
               backgroundColor: colors.backgroundCard,
               borderRadius: 12,
               padding: 10,
+              borderWidth: 1,
+              borderColor: colors.border,
+              shadowColor: colors.shadow,
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.08,
+              shadowRadius: 8,
+              elevation: 2,
             }}
           >
             {/* Title */}
             <TextInput
               style={{
                 fontSize: 32,
-                fontFamily: "serif",
-                color: colors.primary,
-                marginBottom: 8,
-                borderBottomWidth: 2,
-                borderBottomColor: colors.text,
-                paddingBottom: 8,
+                fontFamily: "SpaceGrotesk_700Bold",
+                color: colors.text,
+                marginBottom: 10,
+                borderBottomWidth: 1,
+                borderBottomColor: colors.border,
+                paddingBottom: 10,
               }}
               value={title}
               onChangeText={handleTitleChange}
@@ -560,21 +595,45 @@ const NoteEditorScreen: React.FC = () => {
             >
               <View>
                 <TouchableOpacity onPress={handleMove}>
-                  <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: colors.textSecondary,
+                      fontFamily: "SpaceGrotesk_600SemiBold",
+                    }}
+                  >
                     Folder: {folderPath}
                   </Text>
                 </TouchableOpacity>
-                <Text style={{ fontSize: 12, color: colors.textSecondary }}>
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: colors.textSecondary,
+                    fontFamily: "SpaceGrotesk_500Medium",
+                  }}
+                >
                   Created: {formatDate(note.createdAt)}
                 </Text>
               </View>
 
               <View style={{ alignItems: "flex-end" }}>
-                <Text style={{ fontSize: 10, color: colors.textSecondary }}>
+                <Text
+                  style={{
+                    fontSize: 10,
+                    color: colors.textSecondary,
+                    fontFamily: "SpaceGrotesk_500Medium",
+                  }}
+                >
                   Last save: {getLastSaveText()}
                 </Text>
                 {hasUnsavedChanges && (
-                  <Text style={{ fontSize: 10, color: colors.warning }}>
+                  <Text
+                    style={{
+                      fontSize: 10,
+                      color: colors.warning,
+                      fontFamily: "SpaceGrotesk_600SemiBold",
+                    }}
+                  >
                     • Unsaved
                   </Text>
                 )}
@@ -591,6 +650,8 @@ const NoteEditorScreen: React.FC = () => {
                   overflow: "hidden",
                   marginTop: 8,
                   marginBottom: 8,
+                  borderWidth: 1,
+                  borderColor: colors.border,
                 }}
               >
                 {isPreview ? (
@@ -599,7 +660,7 @@ const NoteEditorScreen: React.FC = () => {
                     keyboardShouldPersistTaps="always"
                     contentContainerStyle={{
                       padding: 16,
-                      paddingBottom: 120,
+                      paddingBottom: contentPaddingBottom,
                     }}
                   >
                     <MarkdownRenderer
@@ -613,7 +674,7 @@ const NoteEditorScreen: React.FC = () => {
                     showsVerticalScrollIndicator={false}
                     contentContainerStyle={{
                       padding: 16,
-                      paddingBottom: 120,
+                      paddingBottom: contentPaddingBottom,
                     }}
                   >
                     <TextInput
@@ -629,8 +690,7 @@ const NoteEditorScreen: React.FC = () => {
                       style={{
                         fontSize: 16,
                         color: colors.text,
-                        fontFamily:
-                          Platform.OS === "ios" ? "Menlo" : "monospace",
+                        fontFamily: "SpaceGrotesk_500Medium",
                         lineHeight: 24,
                         includeFontPadding: false,
                         textAlignVertical: "top",
@@ -774,27 +834,31 @@ const NoteEditorScreen: React.FC = () => {
           right: 0,
           bottom: 0,
           paddingHorizontal: 20,
-          paddingTop: 8,
-          paddingBottom: 90, // ← always 90, no conditions
+          paddingTop: 10,
+          paddingBottom: insets.bottom + 20,
           flexDirection: "row",
           alignItems: "center",
           justifyContent: "center",
           gap: 8,
-          backgroundColor: colors.background,
+          backgroundColor: colors.backgroundCard,
           borderTopWidth: 1,
           borderTopColor: colors.border,
           zIndex: 10,
+          shadowColor: colors.shadow,
+          shadowOffset: { width: 0, height: -2 },
+          shadowOpacity: 0.12,
+          shadowRadius: 8,
         }}
       >
         {/* Back Button */}
         <TouchableOpacity
           style={{
             flex: 1,
-            backgroundColor: colors.backgroundCard,
-            borderRadius: 12,
+            backgroundColor: colors.backgroundAlt,
+            borderRadius: 14,
             paddingLeft: 10,
             paddingRight: 20,
-            height: 40,
+            height: 44,
             alignItems: "center",
             flexDirection: "row",
             justifyContent: "center",
@@ -803,6 +867,8 @@ const NoteEditorScreen: React.FC = () => {
             shadowOpacity: 0.1,
             shadowRadius: 4,
             elevation: 2,
+            borderWidth: 1,
+            borderColor: colors.border,
           }}
           onPress={handleBack}
         >
@@ -812,10 +878,11 @@ const NoteEditorScreen: React.FC = () => {
               numberOfLines={1}
               ellipsizeMode="tail"
               style={{
-                fontSize: 16,
+                fontSize: 15,
                 color: colors.text,
                 paddingLeft: 10,
                 textAlign: "center",
+                fontFamily: "SpaceGrotesk_600SemiBold",
               }}
             >
               Back
@@ -837,9 +904,9 @@ const NoteEditorScreen: React.FC = () => {
         <TouchableOpacity
           style={{
             width: 60,
-            backgroundColor: colors.backgroundCard,
-            borderRadius: 12,
-            height: 40,
+            backgroundColor: colors.backgroundAlt,
+            borderRadius: 14,
+            height: 44,
             alignItems: "center",
             flexDirection: "row",
             justifyContent: "center",
@@ -848,6 +915,8 @@ const NoteEditorScreen: React.FC = () => {
             shadowOpacity: 0.1,
             shadowRadius: 4,
             elevation: 2,
+            borderWidth: 1,
+            borderColor: colors.border,
           }}
           onPress={handleDeletePress}
         >
@@ -867,11 +936,11 @@ const NoteEditorScreen: React.FC = () => {
         <TouchableOpacity
           style={{
             flex: 1,
-            backgroundColor: colors.backgroundCard,
-            borderRadius: 12,
+            backgroundColor: colors.backgroundAlt,
+            borderRadius: 14,
             paddingLeft: 18,
             paddingRight: 20,
-            height: 40,
+            height: 44,
             alignItems: "center",
             flexDirection: "row",
             justifyContent: "center",
@@ -880,6 +949,8 @@ const NoteEditorScreen: React.FC = () => {
             shadowOpacity: 0.1,
             shadowRadius: 4,
             elevation: 2,
+            borderWidth: 1,
+            borderColor: colors.border,
           }}
           onPress={handleSaveNow}
         >
@@ -888,8 +959,9 @@ const NoteEditorScreen: React.FC = () => {
             <Text
               style={{
                 marginLeft: 8,
-                fontSize: 16,
+                fontSize: 15,
                 color: colors.text,
+                fontFamily: "SpaceGrotesk_700Bold",
               }}
             >
               Save
@@ -911,11 +983,11 @@ const NoteEditorScreen: React.FC = () => {
         <TouchableOpacity
           style={{
             flex: 1,
-            backgroundColor: colors.backgroundCard,
-            borderRadius: 12,
+            backgroundColor: colors.backgroundAlt,
+            borderRadius: 14,
             paddingLeft: 14,
             paddingRight: 20,
-            height: 40,
+            height: 44,
             alignItems: "center",
             flexDirection: "row",
             justifyContent: "center",
@@ -924,12 +996,21 @@ const NoteEditorScreen: React.FC = () => {
             shadowOpacity: 0.1,
             shadowRadius: 4,
             elevation: 2,
+            borderWidth: 1,
+            borderColor: colors.border,
           }}
           onPress={handleShare}
         >
           <Share2 size={18} color={colors.text} />
           {showButtonText && (
-            <Text style={{ marginLeft: 8, fontSize: 16, color: colors.text }}>
+            <Text
+              style={{
+                marginLeft: 8,
+                fontSize: 15,
+                color: colors.text,
+                fontFamily: "SpaceGrotesk_700Bold",
+              }}
+            >
               Share
             </Text>
           )}

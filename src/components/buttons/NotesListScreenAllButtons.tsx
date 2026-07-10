@@ -63,37 +63,39 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     flexWrap: "nowrap",
-    paddingHorizontal: 16,
+    paddingHorizontal: 0,
     marginBottom: 12,
-    gap: 8,
+    gap: 10,
     width: "100%", // ✅ fill screen
   },
 
   button: {
     flex: 1, // ✅ evenly share width
     minWidth: 0, // ✅ allow shrinking
-    height: 44,
+    height: 48,
 
     backgroundColor: colors.backgroundCard,
-    borderRadius: 12,
+    borderRadius: 14,
 
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
 
     paddingHorizontal: 12,
-    gap: 8,
+    gap: 10,
 
     shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
 
   text: {
     fontSize: 15,
-    fontWeight: "500",
+    fontFamily: "SpaceGrotesk_600SemiBold",
     color: colors.text,
 
     flexShrink: 1, // ✅ text truncates instead of disappearing

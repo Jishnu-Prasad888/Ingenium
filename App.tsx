@@ -1,11 +1,19 @@
 import React, { useEffect, useState, useRef } from "react";
 import { View, ActivityIndicator, Text } from "react-native";
+import { useFonts } from "expo-font";
 import { AppProvider, useApp } from "./src/context/AppContext";
 import { colors } from "./src/theme/colors";
 import StorageService from "./src/services/StorageService";
 import { AppContent } from "./src/components/AppContent";
 import { useShareIntent } from "expo-share-intent";
 import * as Linking from "expo-linking";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import {
+  SpaceGrotesk_400Regular,
+  SpaceGrotesk_500Medium,
+  SpaceGrotesk_600SemiBold,
+  SpaceGrotesk_700Bold,
+} from "@expo-google-fonts/space-grotesk";
 
 const AppWrapper: React.FC = () => <AppContent />;
 
@@ -73,6 +81,13 @@ const IngeniumApp: React.FC = () => {
   const [initializationError, setInitializationError] = useState<string | null>(
     null
   );
+  const [fontsLoaded] = useFonts({
+    Logo: require("./assets/fonts/logo.ttf"),
+    SpaceGrotesk_400Regular,
+    SpaceGrotesk_500Medium,
+    SpaceGrotesk_600SemiBold,
+    SpaceGrotesk_700Bold,
+  });
 
   useEffect(() => {
     const initializeApp = async () => {
@@ -90,7 +105,7 @@ const IngeniumApp: React.FC = () => {
     initializeApp();
   }, []);
 
-  if (!databaseInitialized) {
+  if (!databaseInitialized || !fontsLoaded) {
     return (
       <View
         style={{
@@ -101,8 +116,15 @@ const IngeniumApp: React.FC = () => {
         }}
       >
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={{ marginTop: 20, color: colors.text, fontSize: 16 }}>
-          Initializing database...
+        <Text
+          style={{
+            marginTop: 20,
+            color: colors.text,
+            fontSize: 16,
+            fontFamily: "SpaceGrotesk_500Medium",
+          }}
+        >
+          Getting things ready...
         </Text>
         {initializationError && (
           <Text
@@ -112,6 +134,7 @@ const IngeniumApp: React.FC = () => {
               fontSize: 14,
               textAlign: "center",
               paddingHorizontal: 20,
+              fontFamily: "SpaceGrotesk_500Medium",
             }}
           >
             {initializationError}
@@ -122,10 +145,12 @@ const IngeniumApp: React.FC = () => {
   }
 
   return (
-    <AppProvider>
-      <IncomingContentHandler />
-      <AppWrapper />
-    </AppProvider>
+    <SafeAreaProvider>
+      <AppProvider>
+        <IncomingContentHandler />
+        <AppWrapper />
+      </AppProvider>
+    </SafeAreaProvider>
   );
 };
 

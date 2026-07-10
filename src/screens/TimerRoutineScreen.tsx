@@ -527,6 +527,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 30,
     fontWeight: "700",
+    fontFamily: "SpaceGrotesk_700Bold",
     textAlign: "center",
   },
   detailTopBar: {
@@ -575,6 +576,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 25,
     fontWeight: "700",
+    fontFamily: "SpaceGrotesk_700Bold",
   },
   controls: {
     minHeight: 98,
@@ -627,6 +629,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 15,
     fontWeight: "700",
+    fontFamily: "SpaceGrotesk_700Bold",
   },
   routineList: {
     paddingTop: 16,
@@ -652,6 +655,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 23,
     fontWeight: "700",
+    fontFamily: "SpaceGrotesk_700Bold",
     marginRight: 10,
   },
   routineActions: {
@@ -668,6 +672,7 @@ const styles = StyleSheet.create({
   helperText: {
     color: colors.text,
     fontSize: 11,
+    fontFamily: "SpaceGrotesk_500Medium",
     textAlign: "center",
     marginBottom: 18,
   },
@@ -675,6 +680,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 24,
     fontWeight: "700",
+    fontFamily: "SpaceGrotesk_700Bold",
     textAlign: "center",
     marginBottom: 28,
   },
@@ -697,6 +703,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 19,
     fontWeight: "700",
+    fontFamily: "SpaceGrotesk_700Bold",
     paddingVertical: 0,
   },
   stepNameInput: {
@@ -728,6 +735,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 20,
     fontWeight: "700",
+    fontFamily: "SpaceGrotesk_700Bold",
     paddingHorizontal: 12,
   },
   nextStep: {
@@ -740,6 +748,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 20,
     fontWeight: "700",
+    fontFamily: "SpaceGrotesk_700Bold",
     paddingHorizontal: 12,
   },
   upNextLine: {
@@ -757,6 +766,7 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 17,
     fontWeight: "700",
+    fontFamily: "SpaceGrotesk_700Bold",
   },
 });
 

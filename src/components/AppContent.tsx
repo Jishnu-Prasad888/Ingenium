@@ -20,7 +20,7 @@ export const AppContent: React.FC = () => {
     useApp();
 
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <DeepLinkHandler />
 
       {isSharing ? (
@@ -40,6 +40,7 @@ export const AppContent: React.FC = () => {
           {currentScreen === "timer-routine" && <TimerRoutineScreen />}
           {currentScreen !== "timer-routine" && <BottomNavigationBar />}
           <SyncIndicator />
+          <DebugDatabaseInfo />
         </>
       )}
     </View>

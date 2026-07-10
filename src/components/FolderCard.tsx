@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Animated,
   Pressable,
+  StyleSheet,
 } from "react-native";
 import { Folder, ChevronRight, Trash2 } from "lucide-react-native";
 import { colors } from "../theme/colors";
@@ -108,125 +109,50 @@ const FolderCard: React.FC<FolderCardProps> = ({ folder }) => {
   return (
     <>
       <TouchableOpacity
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          backgroundColor: colors.backgroundCard,
-          borderRadius: 14,
-          padding: 12,
-          marginBottom: 12,
-          shadowColor: colors.shadow,
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
-          elevation: 2,
-          opacity: isDeleting ? 0.6 : 1,
-          position: "relative",
-        }}
+        style={[styles.card, isDeleting && styles.cardDeleting]}
         activeOpacity={0.9}
         onPress={handleCardPress}
         onLongPress={animateDeleteWiggle}
         delayLongPress={400}
         disabled={isDeleting}
       >
-        {/* Folder Icon */}
-        <View
-          style={{
-            width: 48,
-            height: 48,
-            borderRadius: 24,
-            alignItems: "center",
-            justifyContent: "center",
-            paddingRight: 2,
-          }}
-        >
+        <View style={styles.iconWrap}>
           <Folder size={24} color={colors.primary} />
         </View>
 
-        {/* Content */}
         <View style={{ flex: 1 }}>
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: "600",
-              color: colors.text,
-              marginBottom: 4,
-            }}
-            numberOfLines={1}
-          >
+          <Text style={styles.title} numberOfLines={1}>
             {folder.name || "Unnamed Folder"}
           </Text>
 
-          <Text
-            style={{
-              fontSize: 12,
-              color: colors.textSecondary,
-            }}
-          >
+          <Text style={styles.meta}>
             Created: {new Date(folder.createdAt).toLocaleDateString()}
           </Text>
         </View>
 
-        {/* Chevron */}
-        <View
-          style={{
-            alignItems: "center",
-            justifyContent: "center",
-            marginBottom: 2,
-            paddingTop: 16,
-            marginTop: 20,
-            paddingRight: 4,
-          }}
-        >
-          <ChevronRight size={20} color={colors.textSecondary} />
-        </View>
-
-        {/* Delete Button */}
-        <Pressable
-          onPress={handleDeletePress}
-          onPressIn={animateDeleteIn}
-          onPressOut={animateDeleteOut}
-          style={{
-            position: "absolute",
-            top: 12,
-            right: 12,
-            width: 28,
-            height: 28,
-            borderRadius: 16,
-            backgroundColor: colors.backgroundAlt,
-            borderWidth: 1,
-            borderColor: colors.border,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Animated.View
-            style={{
-              transform: [{ scale: deleteScale }, { rotate: rotation }],
-            }}
+        <View style={styles.rightColumn}>
+          <Pressable
+            onPress={() => setShowRenamePopup(true)}
+            style={styles.actionButton}
           >
-            <Trash2 size={16} color={colors.textSecondary} />
-          </Animated.View>
-        </Pressable>
-
-        <Pressable
-          onPress={() => setShowRenamePopup(true)}
-          style={{
-            position: "absolute",
-            top: 12,
-            right: 48,
-            width: 28,
-            height: 28,
-            borderRadius: 16,
-            backgroundColor: colors.backgroundAlt,
-            borderWidth: 1,
-            borderColor: colors.border,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Pencil size={14} color={colors.textSecondary} />
-        </Pressable>
+            <Pencil size={16} color={colors.textSecondary} />
+          </Pressable>
+          <Pressable
+            onPress={handleDeletePress}
+            onPressIn={animateDeleteIn}
+            onPressOut={animateDeleteOut}
+            style={[styles.actionButton, styles.deleteButton]}
+          >
+            <Animated.View
+              style={{ transform: [{ scale: deleteScale }, { rotate: rotation }] }}
+            >
+              <Trash2 size={16} color={colors.error} />
+            </Animated.View>
+          </Pressable>
+          <View style={styles.chevronShell}>
+            <ChevronRight size={18} color={colors.textSecondary} />
+          </View>
+        </View>
       </TouchableOpacity>
 
       <DeleteConfirmationPopup
@@ -249,3 +175,73 @@ const FolderCard: React.FC<FolderCardProps> = ({ folder }) => {
 };
 
 export default FolderCard;
+
+const styles = StyleSheet.create({
+  card: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.backgroundCard,
+    borderRadius: 16,
+    padding: 12,
+    marginBottom: 12,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 2,
+    opacity: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 12,
+  },
+  cardDeleting: {
+    opacity: 0.6,
+  },
+  iconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 16,
+    backgroundColor: colors.backgroundAlt,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  title: {
+    fontSize: 17,
+    fontFamily: "SpaceGrotesk_700Bold",
+    color: colors.text,
+    marginBottom: 4,
+  },
+  meta: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontFamily: "SpaceGrotesk_500Medium",
+  },
+  rightColumn: {
+    alignItems: "flex-end",
+    gap: 8,
+  },
+  actionButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: colors.backgroundAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  deleteButton: {
+    backgroundColor: colors.warningLight,
+    borderColor: "transparent",
+  },
+  chevronShell: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: colors.backgroundAlt,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+});

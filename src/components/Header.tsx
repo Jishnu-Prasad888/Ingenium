@@ -1,48 +1,93 @@
 import React from "react";
-import { SafeAreaView, View, Text } from "react-native";
+import { SafeAreaView, View, Text, TouchableOpacity } from "react-native";
+import { Menu } from "lucide-react-native";
 import { colors } from "../theme/colors";
-import { useFonts } from "expo-font";
 
-const Header: React.FC = () => {
-  const [fontsLoaded] = useFonts({
-    Logo: require("../../assets/fonts/logo.ttf"),
-  });
+interface HeaderProps {
+  onMenuPress?: () => void;
+  rightSlot?: React.ReactNode;
+}
 
-  if (!fontsLoaded) {
-    return null;
-  }
+const Header: React.FC<HeaderProps> = ({ onMenuPress, rightSlot }) => {
+  const placeholder = (
+    <View style={{ width: 46, height: 46 }} />
+  );
 
   return (
     <SafeAreaView style={{ backgroundColor: colors.background }}>
       <View
-        style={{ paddingTop: 30, paddingBottom: 20, paddingHorizontal: 20 }}
+        style={{
+          paddingTop: 10,
+          paddingBottom: 12,
+          paddingHorizontal: 20,
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
       >
-        <Text
-          style={{
-            fontSize: 52,
-            fontFamily: "Logo",
-            textAlign: "center",
-            color: colors.text,
-            letterSpacing: -1,
-            paddingTop: 10,
-            marginBottom: -6,
-          }}
-        >
-          Ingenium
-        </Text>
+        {onMenuPress ? placeholder : <View style={{ width: 10 }} />}
 
-        <Text
+        <View style={{ flex: 1, alignItems: "center" }}>
+          <Text
+            style={{
+              fontSize: 34,
+              fontFamily: "Logo",
+              color: colors.text,
+              letterSpacing: -0.5,
+              textAlign: "center",
+            }}
+          >
+            Ingenium
+          </Text>
+          <Text
+            style={{
+              marginTop: 2,
+              fontSize: 10,
+              color: colors.textSecondary,
+              fontFamily: "SpaceGrotesk_600SemiBold",
+              letterSpacing: 0.8,
+              textAlign: "center",
+              textTransform: "uppercase",
+            }}
+          >
+            Harmonising Imagination and Structure
+          </Text>
+        </View>
+
+        <View
           style={{
-            fontSize: 11,
-            fontFamily: "serif",
-            textAlign: "center",
-            color: colors.text,
-            marginTop: 8,
-            letterSpacing: 2,
+            flexDirection: "row",
+            alignItems: "center",
+            gap: 10,
+            marginLeft: 12,
           }}
         >
-          Harmonising Imagination and Structure
-        </Text>
+          {rightSlot}
+          {onMenuPress ? (
+            <TouchableOpacity
+              accessibilityLabel="Open menu"
+              onPress={onMenuPress}
+              activeOpacity={0.9}
+              style={{
+                width: 46,
+                height: 46,
+                borderRadius: 16,
+                backgroundColor: colors.backgroundCard,
+                alignItems: "center",
+                justifyContent: "center",
+                borderWidth: 1,
+                borderColor: colors.border,
+                shadowColor: colors.shadow,
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.2,
+                shadowRadius: 4,
+                elevation: 2,
+              }}
+            >
+              <Menu size={22} color={colors.text} strokeWidth={2.5} />
+            </TouchableOpacity>
+          ) : placeholder}
+        </View>
       </View>
     </SafeAreaView>
   );

@@ -37,19 +37,27 @@ export function EmptyNotesState() {
           opacity: fadeAnim,
           transform: [{ translateY: translateAnim }],
           alignItems: "center",
-          backgroundColor: colors.backgroundAlt,
+          backgroundColor: colors.backgroundCard,
           borderRadius: 20,
           paddingVertical: 40,
           paddingHorizontal: 24,
+          borderWidth: 1,
+          borderColor: colors.border,
+          shadowColor: colors.shadow,
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.12,
+          shadowRadius: 10,
         }}
       >
         {/* Icon Illustration */}
         <View
           style={{
-            backgroundColor: colors.backgroundCard,
+            backgroundColor: colors.backgroundAlt,
             borderRadius: 48,
             padding: 18,
             marginBottom: 20,
+            borderWidth: 1,
+            borderColor: colors.border,
           }}
         >
           <NotebookPen size={36} color={colors.primary} />
@@ -58,7 +66,7 @@ export function EmptyNotesState() {
         <Text
           style={{
             fontSize: 24,
-            fontWeight: "600",
+            fontFamily: "SpaceGrotesk_700Bold",
             color: colors.text,
             marginBottom: 12,
             textAlign: "center",
@@ -69,14 +77,15 @@ export function EmptyNotesState() {
 
         <Text
           style={{
-            fontSize: 16,
+            fontSize: 15,
             color: colors.textSecondary,
             textAlign: "center",
             lineHeight: 22,
+            fontFamily: "SpaceGrotesk_500Medium",
           }}
         >
           You don’t have any notes yet. Tap{" "}
-          <Text style={{ color: colors.primary, fontWeight: "500" }}>
+          <Text style={{ color: colors.primary, fontFamily: "SpaceGrotesk_700Bold" }}>
             Create a new note +
           </Text>{" "}
           to get started.

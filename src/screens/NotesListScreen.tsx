@@ -11,7 +11,7 @@ import {
   Pressable,
   StyleSheet,
 } from "react-native";
-import { Clock3, Menu, X } from "lucide-react-native";
+import { Clock3, X } from "lucide-react-native";
 import { useApp } from "../context/AppContext";
 import Header from "../components/Header";
 import SearchBar from "../components/SearchBar";
@@ -83,27 +83,22 @@ const NotesListScreen: React.FC = () => {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <Header />
-      <TouchableOpacity
-        accessibilityLabel="Open menu"
-        onPress={openDrawer}
-        style={styles.menuButton}
-      >
-        <Menu size={34} color="#FF7A7D" strokeWidth={3} />
-      </TouchableOpacity>
-      <SearchBar />
+    <View style={styles.screen}>
+      <View style={styles.backdrop} pointerEvents="none">
+        <View
+          style={[styles.blob, { top: -70, right: -60, backgroundColor: colors.secondary }]}
+        />
+        <View
+          style={[styles.blob, { top: 160, left: -50, backgroundColor: colors.primary }]}
+        />
+      </View>
 
+      <Header onMenuPress={openDrawer} />
+
+      <SearchBar />
       <SortControl />
 
-      <View
-        style={{
-          paddingHorizontal: 20,
-          marginBottom: 12,
-          flexDirection: "row",
-          gap: 8,
-        }}
-      >
+      <View style={{ paddingHorizontal: 20, marginBottom: 6 }}>
         <NotesListScreenAllButtons
           createNote={createNote}
           queryNotes={queryNotes}
@@ -111,14 +106,18 @@ const NotesListScreen: React.FC = () => {
         />
       </View>
 
-      <Divider text="Your notes here" />
+      <Divider text="Your notes" />
 
       {allNotes.length > 0 ? (
-        <ScrollView ref={scrollRef} style={{ flex: 1, paddingHorizontal: 20 }}>
+        <ScrollView
+          ref={scrollRef}
+          style={{ flex: 1, paddingHorizontal: 20 }}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+        >
           {allNotes.map((note) => (
             <NoteCard key={note.id} note={note} />
           ))}
-          <View style={{ height: 100 }} />
         </ScrollView>
       ) : (
         <EmptyNotesState />
@@ -155,7 +154,7 @@ const NotesListScreen: React.FC = () => {
               onPress={() => closeDrawer()}
               style={styles.drawerCloseButton}
             >
-              <X size={21} color={colors.primary} strokeWidth={2.6} />
+              <X size={21} color={colors.text} strokeWidth={2.6} />
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -178,36 +177,31 @@ const NotesListScreen: React.FC = () => {
 export default NotesListScreen;
 
 const styles = StyleSheet.create({
-  menuButton: {
+  screen: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: -1,
+  },
+  blob: {
     position: "absolute",
-    top: 58,
-    left: 14,
-    zIndex: 10,
-    width: 48,
-    height: 48,
-    alignItems: "center",
-    justifyContent: "center",
+    width: 200,
+    height: 200,
+    borderRadius: 120,
+    opacity: 0.14,
+    transform: [{ rotate: "15deg" }],
   },
-  button: {
-    backgroundColor: colors.backgroundCard,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    height: 40,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  text: {
-    fontSize: 16,
-    color: colors.text,
-    fontWeight: "500",
+  listContent: {
+    paddingBottom: 170,
   },
   drawerScrim: {
     position: "absolute",
     top: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: "rgba(44,24,16,0.18)",
+    backgroundColor: "rgba(15,23,42,0.2)",
   },
   drawerLayer: {
     zIndex: 100,
@@ -220,12 +214,14 @@ const styles = StyleSheet.create({
     bottom: 0,
     borderTopRightRadius: 24,
     borderBottomRightRadius: 24,
-    backgroundColor: colors.background,
+    backgroundColor: colors.backgroundCard,
     paddingTop: 54,
     paddingHorizontal: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
     shadowColor: colors.shadow,
     shadowOffset: { width: 6, height: 0 },
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.2,
     shadowRadius: 10,
     zIndex: 101,
     elevation: 101,
@@ -236,6 +232,8 @@ const styles = StyleSheet.create({
     height: 34,
     borderRadius: 17,
     backgroundColor: colors.backgroundAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 34,
@@ -246,20 +244,20 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 7,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.secondary,
     borderTopRightRadius: 24,
   },
   drawerItem: {
     minHeight: 52,
     borderRadius: 14,
-    backgroundColor: colors.backgroundCard,
+    backgroundColor: colors.backgroundAlt,
     paddingHorizontal: 12,
     flexDirection: "row",
     alignItems: "center",
     gap: 11,
     shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.28,
+    shadowOpacity: 0.18,
     shadowRadius: 7,
     elevation: 5,
   },
@@ -267,13 +265,15 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 12,
-    backgroundColor: colors.backgroundFolder,
+    backgroundColor: colors.backgroundCard,
     alignItems: "center",
     justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   drawerItemText: {
     color: colors.text,
     fontSize: 17,
-    fontWeight: "700",
+    fontFamily: "SpaceGrotesk_700Bold",
   },
 });

@@ -3,6 +3,7 @@ import { View, TouchableOpacity } from "react-native";
 import { List, FilePlus, Folder, Pencil } from "lucide-react-native";
 import { useApp } from "../context/AppContext";
 import { colors } from "../theme/colors";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const BottomNavigationBar: React.FC = () => {
   const {
@@ -13,6 +14,7 @@ const BottomNavigationBar: React.FC = () => {
     setCurrentNoteId,
     createNote,
   } = useApp();
+  const insets = useSafeAreaInsets();
 
   return (
     <View
@@ -21,21 +23,23 @@ const BottomNavigationBar: React.FC = () => {
         bottom: 0,
         left: 0,
         right: 0,
-        paddingHorizontal: 10,
-        paddingBottom: 30,
+        paddingHorizontal: 14,
+        paddingBottom: Math.max(insets.bottom, 12) + 12,
       }}
     >
       <View
         style={{
           flexDirection: "row",
-          backgroundColor: colors.backgroundFolder,
+          backgroundColor: colors.backgroundCard,
           borderRadius: 20,
-          padding: 4,
+          padding: 6,
           shadowColor: colors.shadow,
           shadowOffset: { width: 0, height: -2 },
-          shadowOpacity: 0.3,
-          shadowRadius: 4,
-          elevation: 5,
+          shadowOpacity: 0.14,
+          shadowRadius: 10,
+          elevation: 6,
+          borderWidth: 1,
+          borderColor: colors.border,
         }}
       >
         <TouchableOpacity
@@ -43,9 +47,9 @@ const BottomNavigationBar: React.FC = () => {
             flex: 1,
             backgroundColor:
               currentScreen === "notes-list"
-                ? colors.backgroundCard
+                ? colors.primaryLight
                 : "transparent",
-            borderRadius: 16,
+            borderRadius: 14,
             padding: 12,
             alignItems: "center",
           }}
@@ -54,7 +58,12 @@ const BottomNavigationBar: React.FC = () => {
             setCurrentScreen("notes-list");
           }}
         >
-          <List size={24} color={colors.text} />
+          <List
+            size={22}
+            color={
+              currentScreen === "notes-list" ? colors.primary : colors.textSecondary
+            }
+          />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -62,9 +71,9 @@ const BottomNavigationBar: React.FC = () => {
             flex: 1,
             backgroundColor:
               currentScreen === "note-editor"
-                ? colors.backgroundCard
+                ? colors.primaryLight
                 : "transparent",
-            borderRadius: 16,
+            borderRadius: 14,
             padding: 12,
             alignItems: "center",
           }}
@@ -80,7 +89,12 @@ const BottomNavigationBar: React.FC = () => {
             }
           }}
         >
-          <FilePlus size={24} color={colors.text} />
+          <FilePlus
+            size={22}
+            color={
+              currentScreen === "note-editor" ? colors.primary : colors.textSecondary
+            }
+          />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -88,9 +102,9 @@ const BottomNavigationBar: React.FC = () => {
             flex: 1,
             backgroundColor:
               currentScreen === "folder-explorer"
-                ? colors.backgroundCard
+                ? colors.primaryLight
                 : "transparent",
-            borderRadius: 16,
+            borderRadius: 14,
             padding: 12,
             alignItems: "center",
           }}
@@ -99,7 +113,14 @@ const BottomNavigationBar: React.FC = () => {
             setCurrentScreen("folder-explorer");
           }}
         >
-          <Folder size={24} color={colors.text} />
+          <Folder
+            size={22}
+            color={
+              currentScreen === "folder-explorer"
+                ? colors.primary
+                : colors.textSecondary
+            }
+          />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -107,9 +128,9 @@ const BottomNavigationBar: React.FC = () => {
             flex: 1,
             backgroundColor:
               currentScreen === "whiteboard"
-                ? colors.backgroundCard
+                ? colors.primaryLight
                 : "transparent",
-            borderRadius: 16,
+            borderRadius: 14,
             padding: 12,
             alignItems: "center",
           }}
@@ -118,7 +139,12 @@ const BottomNavigationBar: React.FC = () => {
             setCurrentScreen("whiteboard");
           }}
         >
-          <Pencil size={24} color={colors.text} />
+          <Pencil
+            size={22}
+            color={
+              currentScreen === "whiteboard" ? colors.primary : colors.textSecondary
+            }
+          />
         </TouchableOpacity>
       </View>
     </View>
