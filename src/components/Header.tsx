@@ -9,10 +9,6 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ onMenuPress, rightSlot }) => {
-  const placeholder = (
-    <View style={{ width: 46, height: 46 }} />
-  );
-
   return (
     <SafeAreaView style={{ backgroundColor: colors.background }}>
       <View
@@ -20,14 +16,39 @@ const Header: React.FC<HeaderProps> = ({ onMenuPress, rightSlot }) => {
           paddingTop: 10,
           paddingBottom: 12,
           paddingHorizontal: 20,
-          flexDirection: "row",
           alignItems: "center",
-          justifyContent: "space-between",
+          justifyContent: "center",
         }}
       >
-        {onMenuPress ? placeholder : <View style={{ width: 10 }} />}
+        {onMenuPress && (
+          <TouchableOpacity
+            accessibilityLabel="Open menu"
+            onPress={onMenuPress}
+            activeOpacity={0.9}
+            style={{
+              position: "absolute",
+              left: 20,
+              top: 10,
+              width: 46,
+              height: 46,
+              borderRadius: 16,
+              backgroundColor: colors.backgroundCard,
+              alignItems: "center",
+              justifyContent: "center",
+              borderWidth: 1,
+              borderColor: colors.border,
+              shadowColor: colors.shadow,
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.2,
+              shadowRadius: 4,
+              elevation: 2,
+            }}
+          >
+            <Menu size={22} color={colors.text} strokeWidth={2.5} />
+          </TouchableOpacity>
+        )}
 
-        <View style={{ flex: 1, alignItems: "center" }}>
+        <View style={{ alignItems: "center" }}>
           <Text
             style={{
               fontSize: 34,
@@ -54,40 +75,9 @@ const Header: React.FC<HeaderProps> = ({ onMenuPress, rightSlot }) => {
           </Text>
         </View>
 
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            gap: 10,
-            marginLeft: 12,
-          }}
-        >
-          {rightSlot}
-          {onMenuPress ? (
-            <TouchableOpacity
-              accessibilityLabel="Open menu"
-              onPress={onMenuPress}
-              activeOpacity={0.9}
-              style={{
-                width: 46,
-                height: 46,
-                borderRadius: 16,
-                backgroundColor: colors.backgroundCard,
-                alignItems: "center",
-                justifyContent: "center",
-                borderWidth: 1,
-                borderColor: colors.border,
-                shadowColor: colors.shadow,
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.2,
-                shadowRadius: 4,
-                elevation: 2,
-              }}
-            >
-              <Menu size={22} color={colors.text} strokeWidth={2.5} />
-            </TouchableOpacity>
-          ) : placeholder}
-        </View>
+        {rightSlot && (
+          <View style={{ position: "absolute", right: 20, top: 10 }}>{rightSlot}</View>
+        )}
       </View>
     </SafeAreaView>
   );
