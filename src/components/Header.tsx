@@ -13,9 +13,9 @@ const Header: React.FC<HeaderProps> = ({ onMenuPress, rightSlot }) => {
     <SafeAreaView style={{ backgroundColor: colors.background }}>
       <View
         style={{
-          paddingTop: 10,
-          paddingBottom: 12,
-          paddingHorizontal: 20,
+          paddingTop: 16,
+          paddingBottom: 18,
+          paddingHorizontal: 24,
           alignItems: "center",
           justifyContent: "center",
         }}
@@ -27,8 +27,8 @@ const Header: React.FC<HeaderProps> = ({ onMenuPress, rightSlot }) => {
             activeOpacity={0.9}
             style={{
               position: "absolute",
-              left: 20,
-              top: 10,
+              left: 24,
+              top: 18,
               width: 46,
               height: 46,
               borderRadius: 16,
